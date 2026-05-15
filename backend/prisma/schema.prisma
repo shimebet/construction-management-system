@@ -1,0 +1,254 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+}
+
+enum UserStatus {
+  ACTIVE
+  INACTIVE
+  SUSPENDED
+}
+
+enum ProjectStatus {
+  PLANNING
+  ACTIVE
+  ON_HOLD
+  COMPLETED
+  CANCELLED
+}
+
+enum CompanyUserStatus {
+  ACTIVE
+  INACTIVE
+}
+
+enum ProjectUserStatus {
+  ACTIVE
+  INACTIVE
+}
+
+enum NotificationType {
+  INFO
+  SUCCESS
+  WARNING
+  ERROR
+  APPROVAL
+  DEADLINE
+}
+
+enum AuditAction {
+  CREATE
+  UPDATE
+  DELETE
+  LOGIN
+  LOGOUT
+  APPROVE
+  REJECT
+  EXPORT
+  IMPORT
+}
+
+model User {
+  id           Int        @id @default(autoincrement())
+  name         String
+  email        String     @unique
+  passwordHash String
+  phone        String?
+  jobTitle     String?
+  status       UserStatus @default(ACTIVE)
+
+  companyUsers  CompanyUser[]
+  projectUsers  ProjectUser[]
+  auditLogs     AuditLog[]
+  notifications Notification[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("users")
+}
+
+model Role {
+  id          Int     @id @default(autoincrement())
+  name        String
+  description String?
+  isSystem    Boolean @default(false)
+
+  rolePermissions RolePermission[]
+  companyUsers    CompanyUser[]
+  projectUsers    ProjectUser[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([name])
+  @@map("roles")
+}
+
+model Permission {
+  id          Int     @id @default(autoincrement())
+  module      String
+  action      String
+  description String?
+
+  rolePermissions RolePermission[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([module, action])
+  @@map("permissions")
+}
+
+model RolePermission {
+  id           Int @id @default(autoincrement())
+  roleId       Int
+  permissionId Int
+
+  role       Role       @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  permission Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+
+  @@unique([roleId, permissionId])
+  @@map("role_permissions")
+}
+
+model Company {
+  id        Int     @id @default(autoincrement())
+  name      String
+  legalName String?
+  email     String?
+  phone     String?
+  address   String?
+  taxNumber String?
+  currency  String  @default("USD")
+  timezone  String  @default("UTC")
+  language  String  @default("en")
+  isActive  Boolean @default(true)
+
+  companyUsers CompanyUser[]
+  projects     Project[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("companies")
+}
+
+model CompanyUser {
+  id        Int               @id @default(autoincrement())
+  companyId Int
+  userId    Int
+  roleId    Int
+  status    CompanyUserStatus @default(ACTIVE)
+
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role    Role    @relation(fields: [roleId], references: [id])
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([companyId, userId])
+  @@index([companyId])
+  @@index([userId])
+  @@map("company_users")
+}
+
+model Project {
+  id          Int           @id @default(autoincrement())
+  companyId   Int
+  code        String
+  name        String
+  description String?
+  clientName  String?
+  location    String?
+  startDate   DateTime?
+  endDate     DateTime?
+  budget      Decimal?      @db.Decimal(18, 2)
+  currency    String        @default("USD")
+  status      ProjectStatus @default(PLANNING)
+
+  company       Company        @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  projectUsers  ProjectUser[]
+  auditLogs     AuditLog[]
+  notifications Notification[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([companyId, code])
+  @@index([companyId])
+  @@map("projects")
+}
+
+model ProjectUser {
+  id        Int               @id @default(autoincrement())
+  projectId Int
+  userId    Int
+  roleId    Int
+  status    ProjectUserStatus @default(ACTIVE)
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role    Role    @relation(fields: [roleId], references: [id])
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([projectId, userId])
+  @@index([projectId])
+  @@index([userId])
+  @@map("project_users")
+}
+
+model Notification {
+  id        Int              @id @default(autoincrement())
+  userId    Int
+  projectId Int?
+  type      NotificationType @default(INFO)
+  title     String
+  message   String
+  isRead    Boolean          @default(false)
+  readAt    DateTime?
+
+  user    User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  project Project? @relation(fields: [projectId], references: [id], onDelete: SetNull)
+
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+  @@index([projectId])
+  @@map("notifications")
+}
+
+model AuditLog {
+  id          Int         @id @default(autoincrement())
+  userId      Int?
+  projectId   Int?
+  action      AuditAction
+  module      String
+  entityName  String
+  entityId    String?
+  description String?
+  oldData     Json?
+  newData     Json?
+  ipAddress   String?
+  userAgent   String?
+
+  user    User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+  project Project? @relation(fields: [projectId], references: [id], onDelete: SetNull)
+
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+  @@index([projectId])
+  @@index([module])
+  @@index([entityName])
+  @@index([createdAt])
+  @@map("audit_logs")
+}
