@@ -13,6 +13,13 @@ export type LoginPayload = {
   password: string;
 };
 
+export type AuthUser = {
+  sub: number;
+  email: string;
+  name?: string;
+  role?: string;
+};
+
 export const authApi = {
   register: async (data: RegisterPayload) => {
     const response = await api.post('/auth/register', data);
@@ -21,6 +28,11 @@ export const authApi = {
 
   login: async (data: LoginPayload) => {
     const response = await api.post('/auth/login', data);
+    return response.data;
+  },
+
+  getProfile: async (): Promise<AuthUser> => {
+    const response = await api.get('/auth/profile');
     return response.data;
   },
 };

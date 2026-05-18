@@ -1,146 +1,231 @@
+import { useEffect, useState } from 'react';
+import { dashboardApi } from '../../api/dashboard.api';
+import type { DashboardStats } from '../../api/dashboard.api';
 import { Card, DataTable, PageHeader } from '../../components/ui';
 
-type RecentActivity = {
+type Activity = {
   module: string;
-  action: string;
+  description: string;
   status: string;
 };
 
-const stats = [
-  {
-    title: 'Active Projects',
-    value: '0',
-    description: 'Projects currently in progress',
-  },
-  {
-    title: 'Open RFIs',
-    value: '0',
-    description: 'Requests waiting for response',
-  },
-  {
-    title: 'Pending Approvals',
-    value: '0',
-    description: 'Items awaiting approval',
-  },
-  {
-    title: 'Safety Incidents',
-    value: '0',
-    description: 'Open safety records',
-  },
-];
+const initialStats: DashboardStats = {
+  companies: 0,
+  projects: 0,
+  openRfis: 0,
+  pendingApprovals: 0,
+  safetyIncidents: 0,
+  documents: 0,
+};
 
-const recentActivities: RecentActivity[] = [
+const activities: Activity[] = [
   {
     module: 'Projects',
-    action: 'Project dashboard initialized',
-    status: 'Ready',
+    description: 'Project management module connected',
+    status: 'Active',
   },
   {
     module: 'Documents',
-    action: 'Document control module available',
-    status: 'Ready',
+    description: 'Document control and upload system ready',
+    status: 'Active',
   },
   {
     module: 'Quality',
-    action: 'Inspection and NCR workflow available',
-    status: 'Ready',
+    description: 'Quality inspections and NCR workflow enabled',
+    status: 'Active',
   },
   {
     module: 'Finance',
-    action: 'Invoice and payment workflow available',
-    status: 'Ready',
+    description: 'Invoices, payments, and cash flow tracking enabled',
+    status: 'Active',
   },
 ];
 
 export default function DashboardPage() {
+  const [stats, setStats] = useState<DashboardStats>(initialStats);
+  const [loading, setLoading] = useState(false);
+  const [message, setMessage] = useState('');
+
+  async function loadDashboard() {
+    try {
+      setLoading(true);
+      setMessage('');
+
+      const data = await dashboardApi.getStats();
+      setStats(data);
+    } catch (error: any) {
+      setMessage(error.response?.data?.message || 'Failed to load dashboard');
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  useEffect(() => {
+    loadDashboard();
+  }, []);
+
+  const statCards = [
+    {
+      title: 'Companies',
+      value: stats.companies,
+      description: 'Registered organizations',
+    },
+    {
+      title: 'Projects',
+      value: stats.projects,
+      description: 'Total construction projects',
+    },
+    {
+      title: 'Open RFIs',
+      value: stats.openRfis,
+      description: 'Unclosed information requests',
+    },
+    {
+      title: 'Pending Approvals',
+      value: stats.pendingApprovals,
+      description: 'Waiting for review',
+    },
+    {
+      title: 'Safety Incidents',
+      value: stats.safetyIncidents,
+      description: 'Open safety records',
+    },
+    {
+      title: 'Documents',
+      value: stats.documents,
+      description: 'Controlled project documents',
+    },
+  ];
+
   return (
     <div>
       <PageHeader
         title="Dashboard"
-        description="Welcome to BuildPro IMS Construction Integrated Management System."
+        description="Enterprise overview of BuildPro IMS project operations."
       />
 
-      <div
+      {message && (
+        <div
+          style={{
+            marginBottom: 16,
+            padding: 12,
+            borderRadius: 10,
+            background: '#fef2f2',
+            border: '1px solid #fecaca',
+            color: '#991b1b',
+          }}
+        >
+          {message}
+        </div>
+      )}
+
+      {loading && <p>Loading dashboard...</p>}
+
+      <section
         style={{
           display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
+          gridTemplateColumns: 'repeat(auto-fit, minmax(210px, 1fr))',
           gap: 16,
           marginBottom: 24,
         }}
       >
-        {stats.map((item) => (
+        {statCards.map((item) => (
           <Card key={item.title}>
-            <p style={{ margin: 0, color: '#6b7280', fontSize: 14 }}>
+            <p
+              style={{
+                margin: 0,
+                color: '#6b7280',
+                fontSize: 14,
+                fontWeight: 600,
+              }}
+            >
               {item.title}
             </p>
 
-            <h2 style={{ margin: '10px 0', fontSize: 32 }}>{item.value}</h2>
+            <h2
+              style={{
+                margin: '10px 0',
+                fontSize: 34,
+                lineHeight: 1,
+                color: '#111827',
+              }}
+            >
+              {item.value}
+            </h2>
 
             <p style={{ margin: 0, color: '#6b7280', fontSize: 13 }}>
               {item.description}
             </p>
           </Card>
         ))}
-      </div>
+      </section>
 
-      <div
+      <section
         style={{
           display: 'grid',
-          gridTemplateColumns: '2fr 1fr',
+          gridTemplateColumns: 'minmax(0, 2fr) minmax(280px, 1fr)',
           gap: 16,
         }}
+        className="dashboard-grid"
       >
-        <Card title="Recent Activities">
-          <DataTable<RecentActivity>
+        <Card title="Operational Modules">
+          <DataTable<Activity>
             columns={[
               {
                 header: 'Module',
                 accessor: 'module',
               },
               {
-                header: 'Action',
-                accessor: 'action',
+                header: 'Description',
+                accessor: 'description',
               },
               {
                 header: 'Status',
-                accessor: 'status',
+                accessor: (row) => (
+                  <span
+                    style={{
+                      color: '#15803d',
+                      fontWeight: 700,
+                    }}
+                  >
+                    {row.status}
+                  </span>
+                ),
               },
             ]}
-            data={recentActivities}
+            data={activities}
           />
         </Card>
 
-        <Card title="System Status">
-          <div style={{ display: 'grid', gap: 12 }}>
-            <StatusItem label="Backend API" status="Connected" />
-            <StatusItem label="Authentication" status="Enabled" />
-            <StatusItem label="Document Upload" status="Ready" />
-            <StatusItem label="Audit Logging" status="Active" />
+        <Card title="System Health">                 
+       <div className="module-sidebar">
+            <StatusItem label="Backend API" value="Connected" />
+            <StatusItem label="Authentication" value="JWT Enabled" />
+            <StatusItem label="Authorization" value="RBAC Ready" />
+            <StatusItem label="Document Upload" value="Active" />
+            <StatusItem label="Audit Logging" value="Active" />
+            <StatusItem label="Database" value="MySQL + Prisma" />
           </div>
         </Card>
-      </div>
+      </section>
     </div>
   );
 }
 
-function StatusItem({
-  label,
-  status,
-}: {
-  label: string;
-  status: string;
-}) {
+function StatusItem({ label, value }: { label: string; value: string }) {
   return (
     <div
       style={{
         display: 'flex',
         justifyContent: 'space-between',
+        gap: 12,
         borderBottom: '1px solid #f3f4f6',
-        paddingBottom: 8,
+        paddingBottom: 10,
+        fontSize: 14,
       }}
     >
-      <span>{label}</span>
-      <strong style={{ color: '#16a34a' }}>{status}</strong>
+      <span style={{ color: '#374151' }}>{label}</span>
+      <strong style={{ color: '#111827', textAlign: 'right' }}>{value}</strong>
     </div>
   );
 }

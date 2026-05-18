@@ -114,14 +114,7 @@ export default function CompaniesPage() {
         </div>
       )}
 
-      <div
-        style={{
-          display: 'grid',
-          gridTemplateColumns: '360px 1fr',
-          gap: 20,
-          alignItems: 'start',
-        }}
-      >
+   <div className="module-grid">
         <Card title="Create Company">
           <form onSubmit={handleCreate}>
             <Input

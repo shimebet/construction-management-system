@@ -1,5 +1,7 @@
 import { useState } from 'react';
+import { Link } from 'react-router-dom';
 import { authApi } from '../../api/auth.api';
+import { Button, Input } from '../../components/ui';
 
 export default function LoginPage() {
   const [email, setEmail] = useState('admin@buildpro.com');
@@ -14,14 +16,9 @@ export default function LoginPage() {
       setLoading(true);
       setMessage('');
 
-      const data = await authApi.login({
-        email,
-        password,
-      });
+      const data = await authApi.login({ email, password });
 
       localStorage.setItem('accessToken', data.accessToken);
-
-      setMessage('Login successful');
       window.location.href = '/dashboard';
     } catch (error: any) {
       setMessage(error.response?.data?.message || 'Login failed');
@@ -31,36 +28,44 @@ export default function LoginPage() {
   }
 
   return (
-    <div style={{ maxWidth: 420, margin: '80px auto' }}>
-      <h1>BuildPro IMS Login</h1>
+    <div className="auth-page">
+      <div className="auth-card">
+        <div className="auth-brand">
+          <h1>BuildPro IMS</h1>
+          <p>Construction Integrated Management System</p>
+        </div>
 
-      <form onSubmit={handleLogin}>
-        <div style={{ marginBottom: 12 }}>
-          <label>Email</label>
-          <input
-            style={{ width: '100%', padding: 10 }}
+        <h2>Sign in</h2>
+        <p className="auth-muted">Access your project dashboard.</p>
+
+        {message && <div className="auth-error">{message}</div>}
+
+        <form onSubmit={handleLogin}>
+          <Input
+            label="Email"
+            type="email"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
-            type="email"
+            required
           />
-        </div>
 
-        <div style={{ marginBottom: 12 }}>
-          <label>Password</label>
-          <input
-            style={{ width: '100%', padding: 10 }}
+          <Input
+            label="Password"
+            type="password"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
-            type="password"
+            required
           />
-        </div>
 
-        <button disabled={loading} style={{ padding: 10, width: '100%' }}>
-          {loading ? 'Logging in...' : 'Login'}
-        </button>
-      </form>
+          <Button disabled={loading} style={{ width: '100%', marginTop: 8 }}>
+            {loading ? 'Signing in...' : 'Sign In'}
+          </Button>
+        </form>
 
-      {message && <p>{message}</p>}
+        <p className="auth-footer">
+          Do not have an account? <Link to="/register">Create account</Link>
+        </p>
+      </div>
     </div>
   );
 }

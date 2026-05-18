@@ -1,104 +1,186 @@
-import { NavLink, Outlet } from 'react-router-dom';
+import { useEffect, useState } from 'react';
+import { Link, NavLink, Outlet } from 'react-router-dom';
+import { notificationsApi } from '../api/notifications.api';
 
 const menuItems = [
-  { label: 'Dashboard', path: '/dashboard' },
-  { label: 'Companies', path: '/companies' },
-  { label: 'Projects', path: '/projects' },
-  { label: 'WBS', path: '/wbs' },
-  { label: 'Tasks', path: '/tasks' },
-  { label: 'Schedules', path: '/schedules' },
-  { label: 'Daily Reports', path: '/daily-reports' },
-  { label: 'Documents', path: '/documents' },
-  { label: 'RFIs', path: '/rfis' },
-  { label: 'Submittals', path: '/submittals' },
-  { label: 'Approvals', path: '/approvals' },
-  { label: 'Quality', path: '/quality' },
-  { label: 'Safety', path: '/safety' },
-  { label: 'Procurement', path: '/procurement' },
-  { label: 'Inventory', path: '/inventory' },
-  { label: 'Cost', path: '/cost' },
-  { label: 'Finance', path: '/finance' },
-  { label: 'Reports', path: '/reports' },
-  { label: 'Settings', path: '/settings' },
+  { label: 'Dashboard', path: '/dashboard', icon: '📊' },
+  { label: 'Companies', path: '/companies', icon: '🏢' },
+  { label: 'Users', path: '/users', icon: '👥' },
+  { label: 'Projects', path: '/projects', icon: '🏗️' },
+  { label: 'WBS', path: '/wbs', icon: '🧩' },
+  { label: 'Tasks', path: '/tasks', icon: '✅' },
+  { label: 'Milestones', path: '/milestones', icon: '🎯' },
+  { label: 'Schedules', path: '/schedules', icon: '📅' },
+  { label: 'Daily Reports', path: '/daily-reports', icon: '📝' },
+  { label: 'Documents', path: '/documents', icon: '📁' },
+  { label: 'RFIs', path: '/rfis', icon: '❓' },
+  { label: 'Submittals', path: '/submittals', icon: '📤' },
+  { label: 'Approvals', path: '/approvals', icon: '✔️' },
+  { label: 'Quality', path: '/quality', icon: '🛡️' },
+  { label: 'Safety', path: '/safety', icon: '⛑️' },
+  { label: 'Procurement', path: '/procurement', icon: '🛒' },
+  { label: 'Inventory', path: '/inventory', icon: '📦' },
+  { label: 'Cost', path: '/cost', icon: '💰' },
+  { label: 'Finance', path: '/finance', icon: '🏦' },
+  { label: 'Reports', path: '/reports', icon: '📈' },
+  { label: 'Notifications', path: '/notifications', icon: '🔔' },
+  { label: 'Audit Logs', path: '/audit-logs', icon: '🧾' },
+  { label: 'Profile', path: '/profile', icon: '👤' },
+  { label: 'Settings', path: '/settings', icon: '⚙️' },
 ];
 
+type TokenPayload = {
+  sub?: number;
+  email?: string;
+  name?: string;
+};
+
 export default function DashboardLayout() {
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [user, setUser] = useState<TokenPayload | null>(null);
+  const [unreadCount, setUnreadCount] = useState(0);
+
+  useEffect(() => {
+    const token = localStorage.getItem('accessToken');
+
+    if (!token) return;
+
+    try {
+      const payload = JSON.parse(atob(token.split('.')[1]));
+      setUser(payload);
+    } catch {
+      setUser(null);
+    }
+
+    async function loadUnreadNotifications() {
+      try {
+        const notifications = await notificationsApi.findMine();
+        setUnreadCount(
+          notifications.filter((notification) => !notification.isRead).length,
+        );
+      } catch {
+        setUnreadCount(0);
+      }
+    }
+
+    loadUnreadNotifications();
+  }, []);
+
   function logout() {
     localStorage.removeItem('accessToken');
     window.location.href = '/login';
   }
 
-  return (
-    <div style={{ display: 'flex', minHeight: '100vh', background: '#f4f6f8' }}>
-      <aside
-        style={{
-          width: 260,
-          background: '#111827',
-          color: '#fff',
-          padding: 20,
-          position: 'fixed',
-          top: 0,
-          bottom: 0,
-          overflowY: 'auto',
-        }}
-      >
-        <h2 style={{ marginBottom: 4 }}>BuildPro IMS</h2>
-        <p style={{ fontSize: 13, color: '#9ca3af', marginBottom: 24 }}>
-          Construction Management
-        </p>
+  const userName = user?.name || user?.email || 'User';
+  const initials = getInitials(userName);
 
-        <nav style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+  return (
+    <div
+      className={
+        sidebarCollapsed ? 'app-shell sidebar-collapsed-shell' : 'app-shell'
+      }
+    >
+      <aside className={sidebarCollapsed ? 'sidebar collapsed' : 'sidebar'}>
+        <div className="sidebar-header">
+          <div className="sidebar-logo">
+            <span className="sidebar-logo-icon">B</span>
+
+            <div className="sidebar-logo-text">
+              <h2>BuildPro IMS</h2>
+              <p>Construction Management</p>
+            </div>
+          </div>
+
+          <button
+            className="sidebar-collapse-button"
+            onClick={() => setSidebarCollapsed((value) => !value)}
+            title={sidebarCollapsed ? 'Show sidebar' : 'Hide sidebar'}
+            aria-label={sidebarCollapsed ? 'Show sidebar' : 'Hide sidebar'}
+          >
+            {sidebarCollapsed ? '›' : '‹'}
+          </button>
+        </div>
+
+        <nav className="sidebar-nav">
           {menuItems.map((item) => (
             <NavLink
               key={item.path}
               to={item.path}
-              style={({ isActive }) => ({
-                padding: '10px 12px',
-                borderRadius: 8,
-                textDecoration: 'none',
-                color: isActive ? '#111827' : '#d1d5db',
-                background: isActive ? '#f9fafb' : 'transparent',
-                fontWeight: isActive ? 700 : 500,
-              })}
+              title={item.label}
+              className={({ isActive }) =>
+                isActive ? 'sidebar-link active' : 'sidebar-link'
+              }
             >
-              {item.label}
+              <span className="sidebar-icon">{item.icon}</span>
+              <span className="sidebar-text">{item.label}</span>
             </NavLink>
           ))}
         </nav>
 
-        <button
-          onClick={logout}
-          style={{
-            marginTop: 24,
-            width: '100%',
-            padding: 10,
-            borderRadius: 8,
-            border: 'none',
-            cursor: 'pointer',
-          }}
-        >
-          Logout
-        </button>
+        <div className="sidebar-footer">
+          <button className="logout-button" onClick={logout}>
+            <span className="sidebar-icon">⏻</span>
+            <span>Logout</span>
+          </button>
+        </div>
       </aside>
 
-      <main style={{ marginLeft: 260, flex: 1 }}>
-        <header
-          style={{
-            height: 64,
-            background: '#fff',
-            borderBottom: '1px solid #e5e7eb',
-            display: 'flex',
-            alignItems: 'center',
-            padding: '0 24px',
-          }}
-        >
-          <strong>BuildPro IMS Dashboard</strong>
+      <main className="main-content">
+        <header className="topbar">
+          <div className="topbar-left">
+            <button
+              className="topbar-sidebar-toggle"
+              onClick={() => setSidebarCollapsed((value) => !value)}
+              aria-label={sidebarCollapsed ? 'Show sidebar' : 'Hide sidebar'}
+              title={sidebarCollapsed ? 'Show sidebar' : 'Hide sidebar'}
+            >
+              ☰
+            </button>
+
+            <div>
+              <strong>BuildPro IMS</strong>
+              <p style={{ margin: 0, color: '#6b7280', fontSize: 12 }}>
+                Enterprise Construction Integrated Management System
+              </p>
+            </div>
+          </div>
+
+          <div className="topbar-actions">
+            <Link to="/notifications" className="topbar-icon-button">
+              🔔
+              {unreadCount > 0 && (
+                <span className="topbar-badge">{unreadCount}</span>
+              )}
+            </Link>
+
+            <Link to="/profile" className="profile-shortcut">
+              <span className="profile-avatar">{initials}</span>
+
+              <span className="profile-text">
+                <strong>{userName}</strong>
+                <small>View profile</small>
+              </span>
+            </Link>
+
+            <button className="topbar-logout" onClick={logout}>
+              Logout
+            </button>
+          </div>
         </header>
 
-        <section style={{ padding: 24 }}>
+        <section className="page-content">
           <Outlet />
         </section>
       </main>
     </div>
   );
+}
+
+function getInitials(value: string) {
+  return value
+    .split(/[ @.]+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((part) => part[0]?.toUpperCase())
+    .join('');
 }

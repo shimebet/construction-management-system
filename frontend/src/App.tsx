@@ -20,7 +20,11 @@ import SafetyPage from './pages/safety/SafetyPage';
 import SchedulesPage from './pages/schedules/SchedulesPage';
 import SettingsPage from './pages/settings/SettingsPage';
 import SubmittalsPage from './pages/submittals/SubmittalsPage';
+import AuditLogsPage from './pages/audit/AuditLogsPage';
 import TasksPage from './pages/tasks/TasksPage';
+import NotificationsPage from './pages/notifications/NotificationsPage';
+import ProfilePage from './pages/profile/ProfilePage';
+import UsersPage from './pages/users/UsersPage';
 import WbsPage from './pages/wbs/WbsPage';
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
@@ -68,6 +72,10 @@ export default function App() {
           <Route path="/cost" element={<CostPage />} />
           <Route path="/finance" element={<FinancePage />} />
           <Route path="/reports" element={<ReportsPage />} />
+          <Route path="/audit-logs" element={<AuditLogsPage />} />
+          <Route path="/notifications" element={<NotificationsPage />} />
+          <Route path="/users" element={<UsersPage />} />
+          <Route path="/profile" element={<ProfilePage />} />
           <Route path="/settings" element={<SettingsPage />} />
         </Route>
       </Routes>
