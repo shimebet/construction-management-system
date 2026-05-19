@@ -23,9 +23,10 @@ import { ProcurementModule } from './procurement/procurement.module';
 import { InventoryModule } from './inventory/inventory.module';
 import { CostModule } from './cost/cost.module';
 import { FinanceModule } from './finance/finance.module';
+import { ProfileModule } from './profile/profile.module';
 
 @Module({
-  imports: [PrismaModule, AuthModule, UsersModule, CompaniesModule, ProjectsModule, RolesModule, AuditModule, WbsModule, TasksModule, MilestonesModule, SchedulesModule, DailyReportsModule, DocumentsModule, RfisModule, SubmittalsModule, ApprovalsModule, QualityModule, SafetyModule, ProcurementModule, InventoryModule, CostModule, FinanceModule],
+  imports: [PrismaModule, AuthModule, UsersModule, CompaniesModule, ProjectsModule, RolesModule, AuditModule, WbsModule, TasksModule, MilestonesModule, SchedulesModule, DailyReportsModule, DocumentsModule, RfisModule, SubmittalsModule, ApprovalsModule, QualityModule, SafetyModule, ProcurementModule, InventoryModule, CostModule, FinanceModule, ProfileModule],
   controllers: [AppController],
   providers: [AppService],
 })

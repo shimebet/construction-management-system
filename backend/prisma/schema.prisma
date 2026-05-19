@@ -233,6 +233,7 @@ model User {
   passwordHash String
   phone        String?
   jobTitle     String?
+    avatarUrl String?
   status       UserStatus @default(ACTIVE)
 
   companyUsers             CompanyUser[]
