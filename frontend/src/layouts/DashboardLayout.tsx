@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Link, NavLink, Outlet } from 'react-router-dom';
 import { notificationsApi } from '../api/notifications.api';
+import { profileApi } from '../api/profile.api';
 
 const menuItems = [
   { label: 'Dashboard', path: '/dashboard', icon: '📊' },
@@ -29,42 +30,68 @@ const menuItems = [
   { label: 'Settings', path: '/settings', icon: '⚙️' },
 ];
 
-type TokenPayload = {
+type HeaderUser = {
   sub?: number;
+  id?: number;
   email?: string;
   name?: string;
+  avatarUrl?: string | null;
 };
 
 export default function DashboardLayout() {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
-  const [user, setUser] = useState<TokenPayload | null>(null);
+  const [user, setUser] = useState<HeaderUser | null>(null);
   const [unreadCount, setUnreadCount] = useState(0);
 
-  useEffect(() => {
-    const token = localStorage.getItem('accessToken');
+ useEffect(() => {
+  const token = localStorage.getItem('accessToken');
 
-    if (!token) return;
+  if (!token) return;
 
+  try {
+    const payload = JSON.parse(atob(token.split('.')[1]));
+
+    setUser({
+      sub: payload.sub,
+      email: payload.email,
+      name: payload.name,
+    });
+  } catch {
+    setUser(null);
+  }
+
+  async function loadProfile() {
     try {
-      const payload = JSON.parse(atob(token.split('.')[1]));
-      setUser(payload);
+      const profile = await profileApi.getMe();
+
+      setUser({
+        id: profile.id,
+        email: profile.email,
+        name: profile.name,
+        avatarUrl: profile.avatarUrl,
+      });
     } catch {
-      setUser(null);
+      // keep JWT payload fallback
     }
+  }
 
-    async function loadUnreadNotifications() {
-      try {
-        const notifications = await notificationsApi.findMine();
-        setUnreadCount(
-          notifications.filter((notification) => !notification.isRead).length,
-        );
-      } catch {
-        setUnreadCount(0);
-      }
+  async function loadUnreadNotifications() {
+    try {
+      const notifications = await notificationsApi.findMine();
+
+      setUnreadCount(
+        notifications.filter(
+          (notification) => !notification.isRead,
+        ).length,
+      );
+    } catch {
+      setUnreadCount(0);
     }
+  }
 
-    loadUnreadNotifications();
-  }, []);
+  loadProfile();
+  loadUnreadNotifications();
+}, []);
 
   function logout() {
     localStorage.removeItem('accessToken');
@@ -154,7 +181,15 @@ export default function DashboardLayout() {
             </Link>
 
             <Link to="/profile" className="profile-shortcut">
-              <span className="profile-avatar">{initials}</span>
+            {user?.avatarUrl ? (
+  <img
+    src={getFileUrl(user.avatarUrl)}
+    alt="Profile"
+    className="profile-avatar-image"
+  />
+) : (
+  <span className="profile-avatar">{initials}</span>
+)}
 
               <span className="profile-text">
                 <strong>{userName}</strong>
@@ -183,4 +218,13 @@ function getInitials(value: string) {
     .slice(0, 2)
     .map((part) => part[0]?.toUpperCase())
     .join('');
+}
+function getFileUrl(path?: string | null) {
+  if (!path) return '';
+
+  const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
+  const baseUrl = apiUrl.replace('/api', '');
+  const cleanPath = path.replace(/\\/g, '/');
+
+  return `${baseUrl}/${cleanPath}`;
 }

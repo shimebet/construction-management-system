@@ -1,8 +1,14 @@
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom';
+
 import DashboardLayout from './layouts/DashboardLayout';
+import PublicLayout from './layouts/PublicLayout';
+
+import HomePage from './pages/public/HomePage';
 import LoginPage from './pages/auth/LoginPage';
 import RegisterPage from './pages/auth/RegisterPage';
+
 import ApprovalsPage from './pages/approvals/ApprovalsPage';
+import AuditLogsPage from './pages/audit/AuditLogsPage';
 import CompaniesPage from './pages/companies/CompaniesPage';
 import CostPage from './pages/cost/CostPage';
 import DailyReportsPage from './pages/daily-reports/DailyReportsPage';
@@ -11,7 +17,9 @@ import DocumentsPage from './pages/documents/DocumentsPage';
 import FinancePage from './pages/finance/FinancePage';
 import InventoryPage from './pages/inventory/InventoryPage';
 import MilestonesPage from './pages/milestones/MilestonesPage';
+import NotificationsPage from './pages/notifications/NotificationsPage';
 import ProcurementPage from './pages/procurement/ProcurementPage';
+import ProfilePage from './pages/profile/ProfilePage';
 import ProjectsPage from './pages/projects/ProjectsPage';
 import QualityPage from './pages/quality/QualityPage';
 import ReportsPage from './pages/reports/ReportsPage';
@@ -20,10 +28,7 @@ import SafetyPage from './pages/safety/SafetyPage';
 import SchedulesPage from './pages/schedules/SchedulesPage';
 import SettingsPage from './pages/settings/SettingsPage';
 import SubmittalsPage from './pages/submittals/SubmittalsPage';
-import AuditLogsPage from './pages/audit/AuditLogsPage';
 import TasksPage from './pages/tasks/TasksPage';
-import NotificationsPage from './pages/notifications/NotificationsPage';
-import ProfilePage from './pages/profile/ProfilePage';
 import UsersPage from './pages/users/UsersPage';
 import WbsPage from './pages/wbs/WbsPage';
 
@@ -37,15 +42,44 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
   return children;
 }
 
+function PublicOnlyRoute({ children }: { children: React.ReactNode }) {
+  const token = localStorage.getItem('accessToken');
+
+  if (token) {
+    return <Navigate to="/dashboard" replace />;
+  }
+
+  return children;
+}
+
 export default function App() {
   return (
     <BrowserRouter>
       <Routes>
-        <Route path="/" element={<Navigate to="/dashboard" replace />} />
+        {/* Public website and auth pages */}
+        <Route element={<PublicLayout />}>
+          <Route path="/" element={<HomePage />} />
 
-        <Route path="/login" element={<LoginPage />} />
-        <Route path="/register" element={<RegisterPage />} />
+          <Route
+            path="/login"
+            element={
+              <PublicOnlyRoute>
+                <LoginPage />
+              </PublicOnlyRoute>
+            }
+          />
 
+          <Route
+            path="/register"
+            element={
+              <PublicOnlyRoute>
+                <RegisterPage />
+              </PublicOnlyRoute>
+            }
+          />
+        </Route>
+
+        {/* Protected dashboard app */}
         <Route
           element={
             <ProtectedRoute>
@@ -78,6 +112,9 @@ export default function App() {
           <Route path="/profile" element={<ProfilePage />} />
           <Route path="/settings" element={<SettingsPage />} />
         </Route>
+
+        {/* Fallback */}
+        <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </BrowserRouter>
   );
