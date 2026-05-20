@@ -1,7 +1,7 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
-import { PrismaService } from '../prisma/prisma.service';
-import { CreateRoleDto } from './dto/create-role.dto';
 import { AssignPermissionDto } from './dto/assign-permission.dto';
+import { CreateRoleDto } from './dto/create-role.dto';
+import { PrismaService } from '../prisma/prisma.service';
 
 @Injectable()
 export class RolesService {
@@ -16,7 +16,9 @@ export class RolesService {
           },
         },
       },
-      orderBy: { id: 'asc' },
+      orderBy: {
+        id: 'asc',
+      },
     });
   }
 
@@ -49,7 +51,7 @@ export class RolesService {
     return this.prisma.role.create({
       data: {
         name: dto.name,
-        description: dto.description,
+        description: dto.description ?? null,
         isSystem: dto.isSystem ?? false,
       },
     });
@@ -59,7 +61,9 @@ export class RolesService {
     await this.findOneRole(roleId);
 
     const permission = await this.prisma.permission.findUnique({
-      where: { id: dto.permissionId },
+      where: {
+        id: dto.permissionId,
+      },
     });
 
     if (!permission) {
@@ -79,7 +83,6 @@ export class RolesService {
         permissionId: dto.permissionId,
       },
       include: {
-        role: true,
         permission: true,
       },
     });
@@ -87,6 +90,19 @@ export class RolesService {
 
   async removePermission(roleId: number, permissionId: number) {
     await this.findOneRole(roleId);
+
+    const rolePermission = await this.prisma.rolePermission.findUnique({
+      where: {
+        roleId_permissionId: {
+          roleId,
+          permissionId,
+        },
+      },
+    });
+
+    if (!rolePermission) {
+      throw new NotFoundException('Role permission not found');
+    }
 
     return this.prisma.rolePermission.delete({
       where: {

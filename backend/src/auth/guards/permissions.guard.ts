@@ -22,82 +22,69 @@ export class PermissionsGuard implements CanActivate {
         context.getClass(),
       ]);
 
-    if (!requiredPermissions || requiredPermissions.length === 0) {
+    if (!requiredPermissions?.length) {
       return true;
     }
 
     const request = context.switchToHttp().getRequest();
-    const user = request.user;
+    const userId = Number(request.user?.sub);
 
-    if (!user?.sub) {
+    if (!userId) {
       throw new ForbiddenException('User not authenticated');
     }
 
-    const userId = Number(user.sub);
+    const [companyAssignments, projectAssignments] = await Promise.all([
+      this.prisma.companyUser.findMany({
+        where: {
+          userId,
+          status: 'ACTIVE',
+        },
+        include: {
+          role: {
+            include: {
+              rolePermissions: {
+                include: {
+                  permission: true,
+                },
+              },
+            },
+          },
+        },
+      }),
+
+      this.prisma.projectUser.findMany({
+        where: {
+          userId,
+          status: 'ACTIVE',
+        },
+        include: {
+          role: {
+            include: {
+              rolePermissions: {
+                include: {
+                  permission: true,
+                },
+              },
+            },
+          },
+        },
+      }),
+    ]);
 
     const userPermissions = new Set<string>();
 
-    const companyAssignments = await this.prisma.companyUser.findMany({
-      where: {
-        userId,
-        status: 'ACTIVE',
-      },
-      include: {
-        role: {
-          include: {
-            rolePermissions: {
-              include: {
-                permission: true,
-              },
-            },
-          },
-        },
-      },
-    });
-
-    for (const assignment of companyAssignments) {
+    for (const assignment of [...companyAssignments, ...projectAssignments]) {
       for (const rolePermission of assignment.role.rolePermissions) {
         const permission = rolePermission.permission;
         userPermissions.add(`${permission.module}:${permission.action}`);
       }
     }
 
-    const projectAssignments = await this.prisma.projectUser.findMany({
-      where: {
-        userId,
-        status: 'ACTIVE',
-      },
-      include: {
-        role: {
-          include: {
-            rolePermissions: {
-              include: {
-                permission: true,
-              },
-            },
-          },
-        },
-      },
-    });
-
-    for (const assignment of projectAssignments) {
-      for (const rolePermission of assignment.role.rolePermissions) {
-        const permission = rolePermission.permission;
-        userPermissions.add(`${permission.module}:${permission.action}`);
-      }
-    }
-
-    const hasPermission = requiredPermissions.some((permission) =>
+    const hasPermission = requiredPermissions.every((permission) =>
       userPermissions.has(permission),
     );
 
     if (!hasPermission) {
-      console.log('RBAC DEBUG:', {
-        userId,
-        requiredPermissions,
-        userPermissions: Array.from(userPermissions),
-      });
-
       throw new ForbiddenException('You do not have permission');
     }
 
