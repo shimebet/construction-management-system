@@ -13,11 +13,41 @@ export type LoginPayload = {
   password: string;
 };
 
+export type LoginResponse = {
+  accessToken: string;
+};
+
 export type AuthUser = {
   sub: number;
   email: string;
   name?: string;
   role?: string;
+};
+
+export type AuthCompany = {
+  id: number;
+  name: string;
+  role: string;
+};
+
+export type AuthProject = {
+  id: number;
+  code: string;
+  name: string;
+  role: string;
+};
+
+export type AuthMe = {
+  id: number;
+  name: string;
+  email: string;
+  phone?: string | null;
+  jobTitle?: string | null;
+  avatarUrl?: string | null;
+  status: string;
+  companies: AuthCompany[];
+  projects: AuthProject[];
+  permissions: string[];
 };
 
 export const authApi = {
@@ -26,13 +56,18 @@ export const authApi = {
     return response.data;
   },
 
-  login: async (data: LoginPayload) => {
+  login: async (data: LoginPayload): Promise<LoginResponse> => {
     const response = await api.post('/auth/login', data);
     return response.data;
   },
 
   getProfile: async (): Promise<AuthUser> => {
     const response = await api.get('/auth/profile');
+    return response.data;
+  },
+
+  me: async (): Promise<AuthMe> => {
+    const response = await api.get('/auth/me');
     return response.data;
   },
 };

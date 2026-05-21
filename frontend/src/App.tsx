@@ -52,6 +52,42 @@ function PublicOnlyRoute({ children }: { children: React.ReactNode }) {
   return children;
 }
 
+function ProtectedPermissionRoute({
+  children,
+  required,
+}: {
+  children: React.ReactNode;
+  required: string[];
+}) {
+  const token = localStorage.getItem('accessToken');
+  const rawUser = localStorage.getItem('authUser');
+
+  if (!token) {
+    return <Navigate to="/login" replace />;
+  }
+
+  if (!rawUser) {
+    return <Navigate to="/dashboard" replace />;
+  }
+
+  try {
+    const user = JSON.parse(rawUser);
+    const permissions: string[] = user.permissions || [];
+
+    const allowed = required.length === 0
+      ? true
+      : required.some((permission) => permissions.includes(permission));
+
+    if (!allowed) {
+      return <Navigate to="/dashboard" replace />;
+    }
+
+    return children;
+  } catch {
+    return <Navigate to="/dashboard" replace />;
+  }
+}
+
 export default function App() {
   return (
     <BrowserRouter>
@@ -87,30 +123,214 @@ export default function App() {
             </ProtectedRoute>
           }
         >
-          <Route path="/dashboard" element={<DashboardPage />} />
-          <Route path="/companies" element={<CompaniesPage />} />
-          <Route path="/projects" element={<ProjectsPage />} />
-          <Route path="/wbs" element={<WbsPage />} />
-          <Route path="/tasks" element={<TasksPage />} />
-          <Route path="/milestones" element={<MilestonesPage />} />
-          <Route path="/schedules" element={<SchedulesPage />} />
-          <Route path="/daily-reports" element={<DailyReportsPage />} />
-          <Route path="/documents" element={<DocumentsPage />} />
-          <Route path="/rfis" element={<RfisPage />} />
-          <Route path="/submittals" element={<SubmittalsPage />} />
-          <Route path="/approvals" element={<ApprovalsPage />} />
-          <Route path="/quality" element={<QualityPage />} />
-          <Route path="/safety" element={<SafetyPage />} />
-          <Route path="/procurement" element={<ProcurementPage />} />
-          <Route path="/inventory" element={<InventoryPage />} />
-          <Route path="/cost" element={<CostPage />} />
-          <Route path="/finance" element={<FinancePage />} />
-          <Route path="/reports" element={<ReportsPage />} />
-          <Route path="/audit-logs" element={<AuditLogsPage />} />
-          <Route path="/notifications" element={<NotificationsPage />} />
-          <Route path="/users" element={<UsersPage />} />
-          <Route path="/profile" element={<ProfilePage />} />
-          <Route path="/settings" element={<SettingsPage />} />
+<Route path="/dashboard" element={<DashboardPage />} />
+
+          <Route
+            path="/companies"
+            element={
+              <ProtectedPermissionRoute required={['companies:read']}>
+                <CompaniesPage />
+              </ProtectedPermissionRoute>
+            }
+          />
+
+          <Route
+            path="/projects"
+            element={
+              <ProtectedPermissionRoute required={['projects:read']}>
+                <ProjectsPage />
+              </ProtectedPermissionRoute>
+            }
+          />
+
+          <Route
+            path="/wbs"
+            element={
+              <ProtectedPermissionRoute required={['wbs:read']}>
+                <WbsPage />
+              </ProtectedPermissionRoute>
+            }
+          />
+
+          <Route
+            path="/tasks"
+            element={
+              <ProtectedPermissionRoute required={['tasks:read']}>
+                <TasksPage />
+              </ProtectedPermissionRoute>
+            }
+          />
+
+          <Route
+            path="/milestones"
+            element={
+              <ProtectedPermissionRoute required={['milestones:read']}>
+                <MilestonesPage />
+              </ProtectedPermissionRoute>
+            }
+          />
+
+          <Route
+            path="/schedules"
+            element={
+              <ProtectedPermissionRoute required={['schedules:read']}>
+                <SchedulesPage />
+              </ProtectedPermissionRoute>
+            }
+          />
+
+          <Route
+            path="/daily-reports"
+            element={
+              <ProtectedPermissionRoute required={['daily_reports:read']}>
+                <DailyReportsPage />
+              </ProtectedPermissionRoute>
+            }
+          />
+
+          <Route
+            path="/documents"
+            element={
+              <ProtectedPermissionRoute required={['documents:read']}>
+                <DocumentsPage />
+              </ProtectedPermissionRoute>
+            }
+          />
+
+          <Route
+            path="/rfis"
+            element={
+              <ProtectedPermissionRoute required={['rfis:read']}>
+                <RfisPage />
+              </ProtectedPermissionRoute>
+            }
+          />
+
+          <Route
+            path="/submittals"
+            element={
+              <ProtectedPermissionRoute required={['submittals:read']}>
+                <SubmittalsPage />
+              </ProtectedPermissionRoute>
+            }
+          />
+
+          <Route
+            path="/approvals"
+            element={
+              <ProtectedPermissionRoute required={['approvals:read']}>
+                <ApprovalsPage />
+              </ProtectedPermissionRoute>
+            }
+          />
+
+          <Route
+            path="/quality"
+            element={
+              <ProtectedPermissionRoute required={['quality:read']}>
+                <QualityPage />
+              </ProtectedPermissionRoute>
+            }
+          />
+
+          <Route
+            path="/safety"
+            element={
+              <ProtectedPermissionRoute required={['safety:read']}>
+                <SafetyPage />
+              </ProtectedPermissionRoute>
+            }
+          />
+
+          <Route
+            path="/procurement"
+            element={
+              <ProtectedPermissionRoute required={['procurement:read']}>
+                <ProcurementPage />
+              </ProtectedPermissionRoute>
+            }
+          />
+
+          <Route
+            path="/inventory"
+            element={
+              <ProtectedPermissionRoute required={['inventory:read']}>
+                <InventoryPage />
+              </ProtectedPermissionRoute>
+            }
+          />
+
+          <Route
+            path="/cost"
+            element={
+              <ProtectedPermissionRoute required={['cost:read']}>
+                <CostPage />
+              </ProtectedPermissionRoute>
+            }
+          />
+
+          <Route
+            path="/finance"
+            element={
+              <ProtectedPermissionRoute required={['finance:read']}>
+                <FinancePage />
+              </ProtectedPermissionRoute>
+            }
+          />
+
+          <Route
+            path="/reports"
+            element={
+              <ProtectedPermissionRoute required={['reports:read']}>
+                <ReportsPage />
+              </ProtectedPermissionRoute>
+            }
+          />
+
+          <Route
+            path="/audit-logs"
+            element={
+              <ProtectedPermissionRoute required={['audit_logs:read']}>
+                <AuditLogsPage />
+              </ProtectedPermissionRoute>
+            }
+          />
+
+          <Route
+            path="/notifications"
+            element={
+              <ProtectedPermissionRoute required={['notifications:read']}>
+                <NotificationsPage />
+              </ProtectedPermissionRoute>
+            }
+          />
+
+          <Route
+            path="/users"
+            element={
+              <ProtectedPermissionRoute required={['users:read']}>
+                <UsersPage />
+              </ProtectedPermissionRoute>
+            }
+          />
+
+          <Route
+            path="/profile"
+            element={
+              <ProtectedPermissionRoute required={[]}>
+                <ProfilePage />
+              </ProtectedPermissionRoute>
+            }
+          />
+
+          <Route
+            path="/settings"
+            element={
+              <ProtectedPermissionRoute required={['settings:read', 'roles:read']}>
+                <SettingsPage />
+              </ProtectedPermissionRoute>
+            }
+          />
         </Route>
 
         {/* Fallback */}

@@ -16,11 +16,21 @@ export default function LoginPage() {
       setLoading(true);
       setMessage('');
 
-      const data = await authApi.login({ email, password });
+      const data = await authApi.login({
+        email,
+        password,
+      });
 
       localStorage.setItem('accessToken', data.accessToken);
+
+      const profile = await authApi.me();
+      localStorage.setItem('authUser', JSON.stringify(profile));
+
       window.location.href = '/dashboard';
     } catch (error: any) {
+      localStorage.removeItem('accessToken');
+      localStorage.removeItem('authUser');
+
       setMessage(error.response?.data?.message || 'Login failed');
     } finally {
       setLoading(false);

@@ -1,113 +1,214 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Link, NavLink, Outlet } from 'react-router-dom';
+import { authApi } from '../api/auth.api';
+import type { AuthMe } from '../api/auth.api';
 import { notificationsApi } from '../api/notifications.api';
-import { profileApi } from '../api/profile.api';
 
 const menuItems = [
-  { label: 'Dashboard', path: '/dashboard', icon: '📊' },
-  { label: 'Companies', path: '/companies', icon: '🏢' },
-  { label: 'Users', path: '/users', icon: '👥' },
-  { label: 'Projects', path: '/projects', icon: '🏗️' },
-  { label: 'WBS', path: '/wbs', icon: '🧩' },
-  { label: 'Tasks', path: '/tasks', icon: '✅' },
-  { label: 'Milestones', path: '/milestones', icon: '🎯' },
-  { label: 'Schedules', path: '/schedules', icon: '📅' },
-  { label: 'Daily Reports', path: '/daily-reports', icon: '📝' },
-  { label: 'Documents', path: '/documents', icon: '📁' },
-  { label: 'RFIs', path: '/rfis', icon: '❓' },
-  { label: 'Submittals', path: '/submittals', icon: '📤' },
-  { label: 'Approvals', path: '/approvals', icon: '✔️' },
-  { label: 'Quality', path: '/quality', icon: '🛡️' },
-  { label: 'Safety', path: '/safety', icon: '⛑️' },
-  { label: 'Procurement', path: '/procurement', icon: '🛒' },
-  { label: 'Inventory', path: '/inventory', icon: '📦' },
-  { label: 'Cost', path: '/cost', icon: '💰' },
-  { label: 'Finance', path: '/finance', icon: '🏦' },
-  { label: 'Reports', path: '/reports', icon: '📈' },
-  { label: 'Notifications', path: '/notifications', icon: '🔔' },
-  { label: 'Audit Logs', path: '/audit-logs', icon: '🧾' },
-  { label: 'Profile', path: '/profile', icon: '👤' },
-  { label: 'Settings', path: '/settings', icon: '⚙️' },
+  {
+    icon: '📊',
+    label: 'Dashboard',
+    path: '/dashboard',
+    permissions: ['dashboard:read'],
+  },
+  {
+    icon: '🏢',
+    label: 'Companies',
+    path: '/companies',
+    permissions: ['companies:read'],
+  },
+  {
+    icon: '👥',
+    label: 'Users',
+    path: '/users',
+    permissions: ['users:read'],
+  },
+  {
+    icon: '🏗️',
+    label: 'Projects',
+    path: '/projects',
+    permissions: ['projects:read'],
+  },
+  {
+    icon: '🧩',
+    label: 'WBS',
+    path: '/wbs',
+    permissions: ['wbs:read'],
+  },
+  {
+    icon: '✅',
+    label: 'Tasks',
+    path: '/tasks',
+    permissions: ['tasks:read'],
+  },
+  {
+    icon: '🎯',
+    label: 'Milestones',
+    path: '/milestones',
+    permissions: ['milestones:read'],
+  },
+  {
+    icon: '🗓️',
+    label: 'Schedules',
+    path: '/schedules',
+    permissions: ['schedules:read'],
+  },
+  {
+    icon: '📝',
+    label: 'Daily Reports',
+    path: '/daily-reports',
+    permissions: ['daily_reports:read'],
+  },
+  {
+    icon: '📁',
+    label: 'Documents',
+    path: '/documents',
+    permissions: ['documents:read'],
+  },
+  {
+    icon: '❓',
+    label: 'RFIs',
+    path: '/rfis',
+    permissions: ['rfis:read'],
+  },
+  {
+    icon: '📤',
+    label: 'Submittals',
+    path: '/submittals',
+    permissions: ['submittals:read'],
+  },
+  {
+    icon: '✔️',
+    label: 'Approvals',
+    path: '/approvals',
+    permissions: ['approvals:read'],
+  },
+  {
+    icon: '🛡️',
+    label: 'Quality',
+    path: '/quality',
+    permissions: ['quality:read'],
+  },
+  {
+    icon: '⛑️',
+    label: 'Safety',
+    path: '/safety',
+    permissions: ['safety:read'],
+  },
+  {
+    icon: '🛒',
+    label: 'Procurement',
+    path: '/procurement',
+    permissions: ['procurement:read'],
+  },
+  {
+    icon: '📦',
+    label: 'Inventory',
+    path: '/inventory',
+    permissions: ['inventory:read'],
+  },
+  {
+    icon: '💰',
+    label: 'Cost',
+    path: '/cost',
+    permissions: ['cost:read'],
+  },
+  {
+    icon: '🏦',
+    label: 'Finance',
+    path: '/finance',
+    permissions: ['finance:read'],
+  },
+  {
+    icon: '📈',
+    label: 'Reports',
+    path: '/reports',
+    permissions: ['reports:read'],
+  },
+  {
+    icon: '🔔',
+    label: 'Notifications',
+    path: '/notifications',
+    permissions: ['notifications:read'],
+  },
+  {
+    icon: '📜',
+    label: 'Audit Logs',
+    path: '/audit-logs',
+    permissions: ['audit_logs:read'],
+  },
+  {
+    icon: '👤',
+    label: 'Profile',
+    path: '/profile',
+    permissions: [],
+  },
+  {
+    icon: '⚙️',
+    label: 'Settings',
+    path: '/settings',
+    permissions: ['settings:read', 'roles:read'],
+  },
 ];
-
-type HeaderUser = {
-  sub?: number;
-  id?: number;
-  email?: string;
-  name?: string;
-  avatarUrl?: string | null;
-};
 
 export default function DashboardLayout() {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
-  const [user, setUser] = useState<HeaderUser | null>(null);
+  const [user, setUser] = useState<AuthMe | null>(null);
   const [unreadCount, setUnreadCount] = useState(0);
 
- useEffect(() => {
-  const token = localStorage.getItem('accessToken');
+  const permissions = user?.permissions ?? [];
 
-  if (!token) return;
+  const visibleMenuItems = useMemo(() => {
+    return menuItems.filter((item) => {
+      if (item.permissions.length === 0) return true;
 
-  try {
-    const payload = JSON.parse(atob(token.split('.')[1]));
-
-    setUser({
-      sub: payload.sub,
-      email: payload.email,
-      name: payload.name,
-    });
-  } catch {
-    setUser(null);
-  }
-
-  async function loadProfile() {
-    try {
-      const profile = await profileApi.getMe();
-
-      setUser({
-        id: profile.id,
-        email: profile.email,
-        name: profile.name,
-        avatarUrl: profile.avatarUrl,
-      });
-    } catch {
-      // keep JWT payload fallback
-    }
-  }
-
-  async function loadUnreadNotifications() {
-    try {
-      const notifications = await notificationsApi.findMine();
-
-      setUnreadCount(
-        notifications.filter(
-          (notification) => !notification.isRead,
-        ).length,
+      return item.permissions.some((permission) =>
+        permissions.includes(permission),
       );
-    } catch {
-      setUnreadCount(0);
+    });
+  }, [permissions]);
+
+  useEffect(() => {
+    async function loadLayoutData() {
+      try {
+const profile = await authApi.me();
+setUser(profile);
+localStorage.setItem('authUser', JSON.stringify(profile));
+      } catch {
+        localStorage.removeItem('accessToken');
+        window.location.href = '/login';
+      }
+
+      try {
+        const notifications = await notificationsApi.findMine();
+
+        setUnreadCount(
+          notifications.filter((notification) => !notification.isRead).length,
+        );
+      } catch {
+        setUnreadCount(0);
+      }
     }
-  }
 
-  loadProfile();
-  loadUnreadNotifications();
-}, []);
+    loadLayoutData();
+  }, []);
 
-  function logout() {
-    localStorage.removeItem('accessToken');
-    window.location.href = '/login';
-  }
+function logout() {
+  localStorage.removeItem('accessToken');
+  localStorage.removeItem('authUser');
+  window.location.href = '/login';
+}
 
   const userName = user?.name || user?.email || 'User';
   const initials = getInitials(userName);
 
   return (
     <div
-      className={
-        sidebarCollapsed ? 'app-shell sidebar-collapsed-shell' : 'app-shell'
-      }
+      className={`app-shell ${
+        sidebarCollapsed ? 'sidebar-collapsed-shell' : ''
+      }`}
     >
-      <aside className={sidebarCollapsed ? 'sidebar collapsed' : 'sidebar'}>
+      <aside className={`sidebar ${sidebarCollapsed ? 'collapsed' : ''}`}>
         <div className="sidebar-header">
           <div className="sidebar-logo">
             <span className="sidebar-logo-icon">B</span>
@@ -120,20 +221,18 @@ export default function DashboardLayout() {
 
           <button
             className="sidebar-collapse-button"
-            onClick={() => setSidebarCollapsed((value) => !value)}
-            title={sidebarCollapsed ? 'Show sidebar' : 'Hide sidebar'}
-            aria-label={sidebarCollapsed ? 'Show sidebar' : 'Hide sidebar'}
+            onClick={() => setSidebarCollapsed(true)}
+            aria-label="Collapse sidebar"
           >
-            {sidebarCollapsed ? '›' : '‹'}
+            ‹
           </button>
         </div>
 
         <nav className="sidebar-nav">
-          {menuItems.map((item) => (
+          {visibleMenuItems.map((item) => (
             <NavLink
               key={item.path}
               to={item.path}
-              title={item.label}
               className={({ isActive }) =>
                 isActive ? 'sidebar-link active' : 'sidebar-link'
               }
@@ -146,8 +245,7 @@ export default function DashboardLayout() {
 
         <div className="sidebar-footer">
           <button className="logout-button" onClick={logout}>
-            <span className="sidebar-icon">⏻</span>
-            <span>Logout</span>
+            Logout
           </button>
         </div>
       </aside>
@@ -157,9 +255,8 @@ export default function DashboardLayout() {
           <div className="topbar-left">
             <button
               className="topbar-sidebar-toggle"
-              onClick={() => setSidebarCollapsed((value) => !value)}
-              aria-label={sidebarCollapsed ? 'Show sidebar' : 'Hide sidebar'}
-              title={sidebarCollapsed ? 'Show sidebar' : 'Hide sidebar'}
+              onClick={() => setSidebarCollapsed(false)}
+              aria-label="Open sidebar"
             >
               ☰
             </button>
@@ -181,19 +278,19 @@ export default function DashboardLayout() {
             </Link>
 
             <Link to="/profile" className="profile-shortcut">
-            {user?.avatarUrl ? (
-  <img
-    src={getFileUrl(user.avatarUrl)}
-    alt="Profile"
-    className="profile-avatar-image"
-  />
-) : (
-  <span className="profile-avatar">{initials}</span>
-)}
+              {user?.avatarUrl ? (
+                <img
+                  src={getFileUrl(user.avatarUrl)}
+                  alt="Profile"
+                  className="profile-avatar-image"
+                />
+              ) : (
+                <span className="profile-avatar">{initials}</span>
+              )}
 
               <span className="profile-text">
                 <strong>{userName}</strong>
-                <small>View profile</small>
+                <small>{user?.jobTitle || 'View profile'}</small>
               </span>
             </Link>
 
@@ -219,8 +316,11 @@ function getInitials(value: string) {
     .map((part) => part[0]?.toUpperCase())
     .join('');
 }
+
 function getFileUrl(path?: string | null) {
   if (!path) return '';
+
+  if (path.startsWith('http')) return path;
 
   const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
   const baseUrl = apiUrl.replace('/api', '');
