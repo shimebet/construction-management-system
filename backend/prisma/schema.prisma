@@ -233,41 +233,74 @@ model User {
   passwordHash String
   phone        String?
   jobTitle     String?
-    avatarUrl String?
+  avatarUrl    String?
   status       UserStatus @default(ACTIVE)
 
-  companyUsers             CompanyUser[]
-  projectUsers             ProjectUser[]
-  auditLogs                AuditLog[]
-  notifications            Notification[]
-  assignedTasks            Task[]            @relation("TaskAssignee")
-  dailyReports             DailyReport[]
+  employeeId     String?
+  department     String?
+  employmentType String?
+  dateOfBirth    DateTime?
+  gender         String?
+  nationality    String?
+  address        String?
+  emergencyName  String?
+  emergencyPhone String?
+
+  educationLevel String?
+  fieldOfStudy   String?
+  institution    String?
+  graduationYear Int?
+
+  yearsExperience Int?
+  previousCompany String?
+  skills          Json?
+  certifications  Json?
+  languages       Json?
+
+  hireDate DateTime?
+  salary   Decimal?  @db.Decimal(18, 2)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  companyUsers CompanyUser[]
+  projectUsers ProjectUser[]
+
+  assignedTasks Task[] @relation("TaskAssignee")
+
+  preparedDailyReports DailyReport[]
+
   uploadedDocumentVersions DocumentVersion[]
 
   createdRfis  Rfi[] @relation("RfiCreator")
   assignedRfis Rfi[] @relation("RfiAssignee")
 
   createdSubmittals  Submittal[] @relation("SubmittalCreator")
-  assignedSubmittals Submittal[] @relation("SubmittalReviewer")
+  reviewedSubmittals Submittal[] @relation("SubmittalReviewer")
 
   approvals Approval[]
 
-  createdInspections  Inspection[] @relation("InspectionCreator")
-  assignedInspections Inspection[] @relation("InspectionInspector")
+  createdInspections   Inspection[] @relation("InspectionCreator")
+  inspectedInspections Inspection[] @relation("InspectionInspector")
 
-  createdNcrs  NcrReport[] @relation("NcrCreator")
-  assignedNcrs NcrReport[] @relation("NcrAssignee")
+  createdNcrReports  NcrReport[] @relation("NcrCreator")
+  assignedNcrReports NcrReport[] @relation("NcrAssignee")
 
-  safetyIncidents   SafetyIncident[]   @relation("IncidentReporter")
+  reportedSafetyIncidents SafetyIncident[] @relation("IncidentReporter")
+
+  ledToolboxTalks ToolboxTalk[] @relation("ToolboxLeader")
+
   safetyInspections SafetyInspection[] @relation("SafetyInspector")
-  toolboxTalks      ToolboxTalk[]      @relation("ToolboxLeader")
 
-  purchaseRequests      PurchaseRequest[]      @relation("PurchaseRequestRequester")
-  purchaseOrders        PurchaseOrder[]        @relation("PurchaseOrderCreator")
+  requestedPurchaseRequests PurchaseRequest[] @relation("PurchaseRequestRequester")
+
+  createdPurchaseOrders PurchaseOrder[] @relation("PurchaseOrderCreator")
+
   inventoryTransactions InventoryTransaction[] @relation("InventoryTransactionUser")
 
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  notifications Notification[]
+
+  auditLogs AuditLog[]
 
   @@map("users")
 }

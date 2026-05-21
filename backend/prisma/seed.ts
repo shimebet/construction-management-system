@@ -90,7 +90,15 @@ async function main() {
     'settings',
   ];
 
-  const actions = ['create', 'read', 'update', 'delete', 'approve', 'export'];
+const actions = [
+  'create',
+  'read',
+  'update',
+  'delete',
+  'approve',
+  'export',
+  'assign',
+];
 
   for (const moduleName of modules) {
     for (const action of actions) {
@@ -124,7 +132,36 @@ async function main() {
       });
     }
   }
+const dashboardRead = await prisma.permission.upsert({
+  where: {
+    module_action: {
+      module: 'dashboard',
+      action: 'read',
+    },
+  },
+  update: {},
+  create: {
+    module: 'dashboard',
+    action: 'read',
+    description: 'Read dashboard',
+  },
+});
 
+for (const role of [adminRole, managerRole, engineerRole, accountantRole]) {
+  await prisma.rolePermission.upsert({
+    where: {
+      roleId_permissionId: {
+        roleId: role.id,
+        permissionId: dashboardRead.id,
+      },
+    },
+    update: {},
+    create: {
+      roleId: role.id,
+      permissionId: dashboardRead.id,
+    },
+  });
+}
   const admin = await prisma.user.upsert({
     where: { email: 'admin@buildpro.com' },
     update: {},
