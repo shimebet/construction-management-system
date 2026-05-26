@@ -7,17 +7,13 @@ import { UpdateMilestoneDto } from './dto/update-milestone.dto';
 
 @Injectable()
 export class MilestonesService {
-  private readonly db: any;
-
   constructor(
     private readonly prisma: PrismaService,
     private readonly auditService: AuditService,
-  ) {
-    this.db = prisma as any;
-  }
+  ) {}
 
   async create(dto: CreateMilestoneDto, userId?: number) {
-    const project = await this.db.project.findUnique({
+    const project = await this.prisma.project.findUnique({
       where: { id: dto.projectId },
     });
 
@@ -25,7 +21,7 @@ export class MilestonesService {
       throw new NotFoundException('Project not found');
     }
 
-    const milestone = await this.db.milestone.create({
+    const milestone = await this.prisma.milestone.create({
       data: {
         projectId: dto.projectId,
         code: dto.code,
@@ -34,6 +30,7 @@ export class MilestonesService {
         plannedDate: new Date(dto.plannedDate),
         actualDate: dto.actualDate ? new Date(dto.actualDate) : null,
         status: dto.status ?? 'PLANNED',
+        isActive: true,
       },
       include: {
         project: true,
@@ -55,7 +52,7 @@ export class MilestonesService {
   }
 
   findByProject(projectId: number) {
-    return this.db.milestone.findMany({
+    return this.prisma.milestone.findMany({
       where: { projectId },
       include: {
         project: {
@@ -73,7 +70,7 @@ export class MilestonesService {
   }
 
   async findOne(id: number) {
-    const milestone = await this.db.milestone.findUnique({
+    const milestone = await this.prisma.milestone.findUnique({
       where: { id },
       include: {
         project: true,
@@ -91,7 +88,7 @@ export class MilestonesService {
     const oldMilestone = await this.findOne(id);
 
     if (dto.projectId) {
-      const project = await this.db.project.findUnique({
+      const project = await this.prisma.project.findUnique({
         where: { id: dto.projectId },
       });
 
@@ -100,7 +97,7 @@ export class MilestonesService {
       }
     }
 
-    const updatedMilestone = await this.db.milestone.update({
+    const updatedMilestone = await this.prisma.milestone.update({
       where: { id },
       data: {
         projectId: dto.projectId,
@@ -134,10 +131,11 @@ export class MilestonesService {
   async remove(id: number, userId?: number) {
     const oldMilestone = await this.findOne(id);
 
-    const cancelledMilestone = await this.db.milestone.update({
+    const deactivatedMilestone = await this.prisma.milestone.update({
       where: { id },
       data: {
         status: 'CANCELLED',
+        isActive: false,
       },
       include: {
         project: true,
@@ -151,11 +149,40 @@ export class MilestonesService {
       module: 'milestones',
       entityName: 'Milestone',
       entityId: String(id),
-      description: `Cancelled milestone ${oldMilestone.code} - ${oldMilestone.name}`,
+      description: `Deactivated milestone ${oldMilestone.code} - ${oldMilestone.name}`,
       oldData: oldMilestone,
-      newData: cancelledMilestone,
+      newData: deactivatedMilestone,
     });
 
-    return cancelledMilestone;
+    return deactivatedMilestone;
+  }
+
+  async activate(id: number, userId?: number) {
+    const oldMilestone = await this.findOne(id);
+
+    const activatedMilestone = await this.prisma.milestone.update({
+      where: { id },
+      data: {
+        status: 'PLANNED',
+        isActive: true,
+      },
+      include: {
+        project: true,
+      },
+    });
+
+    await this.auditService.create({
+      userId,
+      projectId: oldMilestone.projectId,
+      action: AuditAction.UPDATE,
+      module: 'milestones',
+      entityName: 'Milestone',
+      entityId: String(id),
+      description: `Activated milestone ${oldMilestone.code} - ${oldMilestone.name}`,
+      oldData: oldMilestone,
+      newData: activatedMilestone,
+    });
+
+    return activatedMilestone;
   }
 }

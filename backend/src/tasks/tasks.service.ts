@@ -12,17 +12,13 @@ import { UpdateTaskDto } from './dto/update-task.dto';
 
 @Injectable()
 export class TasksService {
-  private readonly db: any;
-
   constructor(
     private readonly prisma: PrismaService,
     private readonly auditService: AuditService,
-  ) {
-    this.db = prisma as any;
-  }
+  ) {}
 
   async create(dto: CreateTaskDto, userId?: number) {
-    const project = await this.db.project.findUnique({
+    const project = await this.prisma.project.findUnique({
       where: { id: dto.projectId },
     });
 
@@ -36,7 +32,7 @@ export class TasksService {
       assignedToId: dto.assignedToId,
     });
 
-    const task = await this.db.task.create({
+    const task = await this.prisma.task.create({
       data: {
         projectId: dto.projectId,
         wbsItemId: dto.wbsItemId ?? null,
@@ -53,6 +49,7 @@ export class TasksService {
         durationDays: dto.durationDays ?? null,
         progress: dto.progress ?? 0,
         assignedToId: dto.assignedToId ?? null,
+        isActive: true,
       },
       include: this.taskInclude(),
     });
@@ -72,7 +69,7 @@ export class TasksService {
   }
 
   findByProject(projectId: number) {
-    return this.db.task.findMany({
+    return this.prisma.task.findMany({
       where: { projectId },
       include: this.taskInclude(),
       orderBy: [{ plannedStart: 'asc' }, { code: 'asc' }],
@@ -80,7 +77,7 @@ export class TasksService {
   }
 
   async findOne(id: number) {
-    const task = await this.db.task.findUnique({
+    const task = await this.prisma.task.findUnique({
       where: { id },
       include: this.taskInclude(),
     });
@@ -94,11 +91,10 @@ export class TasksService {
 
   async update(id: number, dto: UpdateTaskDto, userId?: number) {
     const oldTask = await this.findOne(id);
-
     const projectId = dto.projectId ?? oldTask.projectId;
 
     if (dto.projectId) {
-      const project = await this.db.project.findUnique({
+      const project = await this.prisma.project.findUnique({
         where: { id: dto.projectId },
       });
 
@@ -114,7 +110,7 @@ export class TasksService {
       assignedToId: dto.assignedToId,
     });
 
-    const updatedTask = await this.db.task.update({
+    const updatedTask = await this.prisma.task.update({
       where: { id },
       data: {
         projectId: dto.projectId,
@@ -154,9 +150,10 @@ export class TasksService {
   async remove(id: number, userId?: number) {
     const oldTask = await this.findOne(id);
 
-    const deletedTask = await this.db.task.update({
+    const deactivatedTask = await this.prisma.task.update({
       where: { id },
       data: {
+        isActive: false,
         status: 'CANCELLED',
       },
       include: this.taskInclude(),
@@ -169,12 +166,39 @@ export class TasksService {
       module: 'tasks',
       entityName: 'Task',
       entityId: String(id),
-      description: `Cancelled task ${oldTask.code} - ${oldTask.name}`,
+      description: `Deactivated task ${oldTask.code} - ${oldTask.name}`,
       oldData: oldTask,
-      newData: deletedTask,
+      newData: deactivatedTask,
     });
 
-    return deletedTask;
+    return deactivatedTask;
+  }
+
+  async activate(id: number, userId?: number) {
+    const oldTask = await this.findOne(id);
+
+    const activatedTask = await this.prisma.task.update({
+      where: { id },
+      data: {
+        isActive: true,
+        status: 'NOT_STARTED',
+      },
+      include: this.taskInclude(),
+    });
+
+    await this.auditService.create({
+      userId,
+      projectId: oldTask.projectId,
+      action: AuditAction.UPDATE,
+      module: 'tasks',
+      entityName: 'Task',
+      entityId: String(id),
+      description: `Activated task ${oldTask.code} - ${oldTask.name}`,
+      oldData: oldTask,
+      newData: activatedTask,
+    });
+
+    return activatedTask;
   }
 
   async createDependency(dto: CreateTaskDependencyDto, userId?: number) {
@@ -182,11 +206,11 @@ export class TasksService {
       throw new BadRequestException('Task cannot depend on itself');
     }
 
-    const predecessor = await this.db.task.findUnique({
+    const predecessor = await this.prisma.task.findUnique({
       where: { id: dto.predecessorId },
     });
 
-    const successor = await this.db.task.findUnique({
+    const successor = await this.prisma.task.findUnique({
       where: { id: dto.successorId },
     });
 
@@ -198,7 +222,7 @@ export class TasksService {
       throw new BadRequestException('Tasks must belong to the same project');
     }
 
-    const dependency = await this.db.taskDependency.create({
+    const dependency = await this.prisma.taskDependency.create({
       data: {
         predecessorId: dto.predecessorId,
         successorId: dto.successorId,
@@ -226,7 +250,7 @@ export class TasksService {
   }
 
   async removeDependency(id: number, userId?: number) {
-    const dependency = await this.db.taskDependency.findUnique({
+    const dependency = await this.prisma.taskDependency.findUnique({
       where: { id },
       include: {
         predecessor: true,
@@ -238,7 +262,7 @@ export class TasksService {
       throw new NotFoundException('Task dependency not found');
     }
 
-    const deleted = await this.db.taskDependency.delete({
+    const deleted = await this.prisma.taskDependency.delete({
       where: { id },
     });
 
@@ -267,7 +291,7 @@ export class TasksService {
     },
   ) {
     if (options.wbsItemId) {
-      const wbs = await this.db.wbsItem.findUnique({
+      const wbs = await this.prisma.wbsItem.findUnique({
         where: { id: options.wbsItemId },
       });
 
@@ -281,7 +305,7 @@ export class TasksService {
         throw new BadRequestException('Task cannot be its own parent');
       }
 
-      const parentTask = await this.db.task.findUnique({
+      const parentTask = await this.prisma.task.findUnique({
         where: { id: options.parentTaskId },
       });
 
@@ -291,7 +315,7 @@ export class TasksService {
     }
 
     if (options.assignedToId) {
-      const user = await this.db.user.findUnique({
+      const user = await this.prisma.user.findUnique({
         where: { id: options.assignedToId },
       });
 

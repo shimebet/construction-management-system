@@ -82,7 +82,9 @@ enum MilestoneStatus {
 
 enum ScheduleBaselineStatus {
   DRAFT
+  PENDING_APPROVAL
   APPROVED
+  REJECTED
   SUPERSEDED
 }
 
@@ -301,8 +303,6 @@ model User {
   notifications Notification[]
 
   auditLogs AuditLog[]
-
-  @@map("users")
 }
 
 model Role {
@@ -615,18 +615,17 @@ model WbsItem {
   name        String
   description String?
   sortOrder   Int     @default(0)
+  isActive    Boolean @default(true)
 
   project  Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
   parent   WbsItem?  @relation("WbsHierarchy", fields: [parentId], references: [id], onDelete: SetNull)
   children WbsItem[] @relation("WbsHierarchy")
-  tasks    Task[]
+
+  tasks Task[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  @@unique([projectId, code])
-  @@index([projectId])
-  @@index([parentId])
   @@map("wbs_items")
 }
 
@@ -645,15 +644,17 @@ model Task {
   plannedEnd   DateTime?
   actualStart  DateTime?
   actualEnd    DateTime?
+  isActive     Boolean   @default(true)
 
   durationDays Int?
   progress     Decimal @default(0.00) @db.Decimal(5, 2)
 
   assignedToId Int?
 
-  project       Project                @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  wbsItem       WbsItem?               @relation(fields: [wbsItemId], references: [id], onDelete: SetNull)
-  assignedTo    User?                  @relation("TaskAssignee", fields: [assignedToId], references: [id], onDelete: SetNull)
+  project    Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  wbsItem    WbsItem? @relation(fields: [wbsItemId], references: [id], onDelete: SetNull)
+  assignedTo User?    @relation("TaskAssignee", fields: [assignedToId], references: [id], onDelete: SetNull)
+
   baselineItems ScheduleBaselineItem[]
 
   parentTask Task?  @relation("TaskHierarchy", fields: [parentTaskId], references: [id], onDelete: SetNull)
@@ -699,6 +700,7 @@ model Milestone {
   description String?
   plannedDate DateTime
   actualDate  DateTime?
+  isActive    Boolean         @default(true)
   status      MilestoneStatus @default(PLANNED)
 
   project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
@@ -719,17 +721,26 @@ model ScheduleBaseline {
   description String?
   version     String
   status      ScheduleBaselineStatus @default(DRAFT)
-  approvedAt  DateTime?
-  approvedBy  Int?
 
-  project Project                @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  items   ScheduleBaselineItem[]
+  isActive Boolean @default(true)
+
+  approvedAt      DateTime?
+  approvedBy      Int?
+  submittedAt     DateTime?
+  submittedBy     Int?
+  rejectedAt      DateTime?
+  rejectedBy      Int?
+  rejectionReason String?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
+  project Project                @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  items   ScheduleBaselineItem[]
+
   @@unique([projectId, version])
   @@index([projectId])
+  @@index([status])
   @@map("schedule_baselines")
 }
 

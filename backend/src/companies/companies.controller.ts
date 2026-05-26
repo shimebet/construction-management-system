@@ -7,100 +7,93 @@ import {
   ParseIntPipe,
   Patch,
   Post,
+  Req,
   UseGuards,
 } from '@nestjs/common';
-import { CurrentUser } from '../auth/decorators/current-user.decorator';
-import { Permissions } from '../auth/decorators/permissions.decorator';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
-import { PermissionsGuard } from '../auth/guards/permissions.guard';
-import { CompaniesService } from './companies.service';
 import { AssignCompanyUserDto } from './dto/assign-company-user.dto';
 import { CreateCompanyDto } from './dto/create-company.dto';
 import { UpdateCompanyUserDto } from './dto/update-company-user.dto';
 import { UpdateCompanyDto } from './dto/update-company.dto';
+import { CompaniesService } from './companies.service';
 
 @Controller('companies')
-@UseGuards(JwtAuthGuard, PermissionsGuard)
+@UseGuards(JwtAuthGuard)
 export class CompaniesController {
   constructor(private readonly companiesService: CompaniesService) {}
 
   @Post()
-  @Permissions('companies:create')
-  create(@Body() dto: CreateCompanyDto, @CurrentUser() user: any) {
-    return this.companiesService.create(dto, Number(user.sub));
+  create(@Body() dto: CreateCompanyDto, @Req() req: any) {
+    return this.companiesService.create(dto, Number(req.user?.sub));
   }
 
   @Get()
-  @Permissions('companies:read')
   findAll() {
     return this.companiesService.findAll();
   }
 
   @Get(':id')
-  @Permissions('companies:read')
   findOne(@Param('id', ParseIntPipe) id: number) {
     return this.companiesService.findOne(id);
   }
 
   @Patch(':id')
-  @Permissions('companies:update')
   update(
     @Param('id', ParseIntPipe) id: number,
     @Body() dto: UpdateCompanyDto,
-    @CurrentUser() user: any,
+    @Req() req: any,
   ) {
-    return this.companiesService.update(id, dto, Number(user.sub));
+    return this.companiesService.update(id, dto, Number(req.user?.sub));
   }
 
   @Delete(':id')
-  @Permissions('companies:delete')
-  remove(@Param('id', ParseIntPipe) id: number, @CurrentUser() user: any) {
-    return this.companiesService.remove(id, Number(user.sub));
+  remove(@Param('id', ParseIntPipe) id: number, @Req() req: any) {
+    return this.companiesService.remove(id, Number(req.user?.sub));
   }
 
   @Post(':id/users')
-  @Permissions('companies:update')
   assignUser(
     @Param('id', ParseIntPipe) companyId: number,
     @Body() dto: AssignCompanyUserDto,
-    @CurrentUser() user: any,
+    @Req() req: any,
   ) {
-    return this.companiesService.assignUser(companyId, dto, Number(user.sub));
+    return this.companiesService.assignUser(
+      companyId,
+      dto,
+      Number(req.user?.sub),
+    );
   }
 
   @Get(':id/users')
-  @Permissions('companies:read')
   listCompanyUsers(@Param('id', ParseIntPipe) companyId: number) {
     return this.companiesService.listCompanyUsers(companyId);
   }
 
   @Patch(':id/users/:userId')
-  @Permissions('companies:update')
   updateCompanyUser(
     @Param('id', ParseIntPipe) companyId: number,
     @Param('userId', ParseIntPipe) userId: number,
     @Body() dto: UpdateCompanyUserDto,
-    @CurrentUser() currentUser: any,
+    @Req() req: any,
   ) {
     return this.companiesService.updateCompanyUser(
       companyId,
       userId,
       dto,
-      Number(currentUser.sub),
+      Number(req.user?.sub),
     );
   }
 
   @Delete(':id/users/:userId')
-  @Permissions('companies:update')
   removeCompanyUser(
     @Param('id', ParseIntPipe) companyId: number,
     @Param('userId', ParseIntPipe) userId: number,
-    @CurrentUser() currentUser: any,
+    @Req() req: any,
   ) {
     return this.companiesService.removeCompanyUser(
       companyId,
       userId,
-      Number(currentUser.sub),
+      Number(req.user?.sub),
     );
   }
 }

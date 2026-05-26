@@ -34,7 +34,13 @@ export class SchedulesController {
   findOne(@Param('id', ParseIntPipe) id: number) {
     return this.schedulesService.findOne(id);
   }
-
+@Post('baselines/:id/unlock')
+unlockBaseline(
+  @Param('id', ParseIntPipe) id: number,
+  @CurrentUser() user: any,
+) {
+  return this.schedulesService.unlockBaseline(id, Number(user.sub));
+}
   @Patch('baselines/:id')
   updateBaseline(
     @Param('id', ParseIntPipe) id: number,
@@ -44,13 +50,40 @@ export class SchedulesController {
     return this.schedulesService.updateBaseline(id, dto, Number(user.sub));
   }
 
+  @Post('baselines/:id/submit')
+  submitBaselineForApproval(
+    @Param('id', ParseIntPipe) id: number,
+    @CurrentUser() user: any,
+  ) {
+    return this.schedulesService.submitBaselineForApproval(id, Number(user.sub));
+  }
+
   @Post('baselines/:id/approve')
   approveBaseline(@Param('id', ParseIntPipe) id: number, @CurrentUser() user: any) {
     return this.schedulesService.approveBaseline(id, Number(user.sub));
   }
 
+  @Post('baselines/:id/reject')
+  rejectBaseline(
+    @Param('id', ParseIntPipe) id: number,
+    @Body('reason') reason: string,
+    @CurrentUser() user: any,
+  ) {
+    return this.schedulesService.rejectBaseline(id, reason, Number(user.sub));
+  }
+
   @Delete('baselines/:id')
   removeBaseline(@Param('id', ParseIntPipe) id: number, @CurrentUser() user: any) {
     return this.schedulesService.removeBaseline(id, Number(user.sub));
+  }
+
+  @Delete('baselines/:id/hard-delete')
+  deleteBaseline(@Param('id', ParseIntPipe) id: number, @CurrentUser() user: any) {
+    return this.schedulesService.deleteBaseline(id, Number(user.sub));
+  }
+
+  @Patch('baselines/:id/activate')
+  activateBaseline(@Param('id', ParseIntPipe) id: number, @CurrentUser() user: any) {
+    return this.schedulesService.activateBaseline(id, Number(user.sub));
   }
 }

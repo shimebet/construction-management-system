@@ -11,17 +11,13 @@ import { UpdateWbsItemDto } from './dto/update-wbs-item.dto';
 
 @Injectable()
 export class WbsService {
-  private readonly db: any;
-
   constructor(
     private readonly prisma: PrismaService,
     private readonly auditService: AuditService,
-  ) {
-    this.db = prisma as any;
-  }
+  ) {}
 
   async create(dto: CreateWbsItemDto, userId?: number) {
-    const project = await this.db.project.findUnique({
+    const project = await this.prisma.project.findUnique({
       where: { id: dto.projectId },
     });
 
@@ -30,7 +26,7 @@ export class WbsService {
     }
 
     if (dto.parentId) {
-      const parent = await this.db.wbsItem.findUnique({
+      const parent = await this.prisma.wbsItem.findUnique({
         where: { id: dto.parentId },
       });
 
@@ -39,7 +35,7 @@ export class WbsService {
       }
     }
 
-    const wbsItem = await this.db.wbsItem.create({
+    const wbsItem = await this.prisma.wbsItem.create({
       data: {
         projectId: dto.projectId,
         parentId: dto.parentId ?? null,
@@ -47,6 +43,7 @@ export class WbsService {
         name: dto.name,
         description: dto.description ?? null,
         sortOrder: dto.sortOrder ?? 0,
+        isActive: true,
       },
       include: this.wbsInclude(),
     });
@@ -66,22 +63,19 @@ export class WbsService {
   }
 
   findByProject(projectId: number) {
-    return this.db.wbsItem.findMany({
-      where: { projectId },
+    return this.prisma.wbsItem.findMany({
+      where: {
+        projectId,
+      },
       include: this.wbsInclude(),
       orderBy: [{ sortOrder: 'asc' }, { code: 'asc' }],
     });
   }
 
   async findOne(id: number) {
-    const wbsItem = await this.db.wbsItem.findUnique({
+    const wbsItem = await this.prisma.wbsItem.findUnique({
       where: { id },
-      include: {
-        project: true,
-        parent: true,
-        children: true,
-        tasks: true,
-      },
+      include: this.wbsInclude(),
     });
 
     if (!wbsItem) {
@@ -93,11 +87,10 @@ export class WbsService {
 
   async update(id: number, dto: UpdateWbsItemDto, userId?: number) {
     const oldWbsItem = await this.findOne(id);
-
     const projectId = dto.projectId ?? oldWbsItem.projectId;
 
     if (dto.projectId) {
-      const project = await this.db.project.findUnique({
+      const project = await this.prisma.project.findUnique({
         where: { id: dto.projectId },
       });
 
@@ -111,7 +104,7 @@ export class WbsService {
         throw new BadRequestException('WBS item cannot be its own parent');
       }
 
-      const parent = await this.db.wbsItem.findUnique({
+      const parent = await this.prisma.wbsItem.findUnique({
         where: { id: dto.parentId },
       });
 
@@ -120,7 +113,7 @@ export class WbsService {
       }
     }
 
-    const updatedWbsItem = await this.db.wbsItem.update({
+    const updatedWbsItem = await this.prisma.wbsItem.update({
       where: { id },
       data: {
         projectId: dto.projectId,
@@ -151,26 +144,12 @@ export class WbsService {
   async remove(id: number, userId?: number) {
     const oldWbsItem = await this.findOne(id);
 
-    const childCount = await this.db.wbsItem.count({
-      where: { parentId: id },
-    });
-
-    if (childCount > 0) {
-      throw new BadRequestException(
-        'Cannot delete WBS item with child WBS items',
-      );
-    }
-
-    const taskCount = await this.db.task.count({
-      where: { wbsItemId: id },
-    });
-
-    if (taskCount > 0) {
-      throw new BadRequestException('Cannot delete WBS item with linked tasks');
-    }
-
-    const deleted = await this.db.wbsItem.delete({
+    const deactivated = await this.prisma.wbsItem.update({
       where: { id },
+      data: {
+        isActive: false,
+      },
+      include: this.wbsInclude(),
     });
 
     await this.auditService.create({
@@ -180,16 +159,43 @@ export class WbsService {
       module: 'wbs',
       entityName: 'WbsItem',
       entityId: String(id),
-      description: `Deleted WBS item ${oldWbsItem.code} - ${oldWbsItem.name}`,
+      description: `Deactivated WBS item ${oldWbsItem.code} - ${oldWbsItem.name}`,
       oldData: oldWbsItem,
-      newData: deleted,
+      newData: deactivated,
     });
 
-    return deleted;
+    return deactivated;
+  }
+
+  async activate(id: number, userId?: number) {
+    const oldWbsItem = await this.findOne(id);
+
+    const activated = await this.prisma.wbsItem.update({
+      where: { id },
+      data: {
+        isActive: true,
+      },
+      include: this.wbsInclude(),
+    });
+
+    await this.auditService.create({
+      userId,
+      projectId: oldWbsItem.projectId,
+      action: AuditAction.UPDATE,
+      module: 'wbs',
+      entityName: 'WbsItem',
+      entityId: String(id),
+      description: `Activated WBS item ${oldWbsItem.code} - ${oldWbsItem.name}`,
+      oldData: oldWbsItem,
+      newData: activated,
+    });
+
+    return activated;
   }
 
   private wbsInclude() {
     return {
+      project: true,
       parent: true,
       children: true,
       tasks: true,
