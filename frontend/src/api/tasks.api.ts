@@ -63,4 +63,8 @@ export const tasksApi = {
     const response = await api.delete(`/tasks/${id}`);
     return response.data;
   },
+  activate: async (id: number): Promise<Task> => {
+  const response = await api.patch(`/tasks/${id}/activate`);
+  return response.data;
+},
 };

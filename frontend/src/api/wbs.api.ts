@@ -21,6 +21,8 @@ export type CreateWbsPayload = {
   sortOrder?: number;
 };
 
+export type UpdateWbsPayload = Partial<CreateWbsPayload>;
+
 export const wbsApi = {
   findByProject: async (projectId: number): Promise<WbsItem[]> => {
     const response = await api.get(`/wbs/project/${projectId}`);
@@ -34,7 +36,7 @@ export const wbsApi = {
 
   update: async (
     id: number,
-    data: Partial<CreateWbsPayload>,
+    data: UpdateWbsPayload,
   ): Promise<WbsItem> => {
     const response = await api.patch(`/wbs/${id}`, data);
     return response.data;

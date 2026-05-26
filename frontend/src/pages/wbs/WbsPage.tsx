@@ -3,53 +3,67 @@ import { projectsApi } from '../../api/projects.api';
 import type { Project } from '../../api/projects.api';
 import { wbsApi } from '../../api/wbs.api';
 import type { CreateWbsPayload, WbsItem } from '../../api/wbs.api';
+import PermissionGuard from '../../components/auth/PermissionGuard';
 import { Button, Card, DataTable, Input, PageHeader } from '../../components/ui';
+
+const emptyForm: CreateWbsPayload = {
+  projectId: 0,
+  parentId: null,
+  code: '',
+  name: '',
+  description: '',
+  sortOrder: 0,
+};
 
 export default function WbsPage() {
   const [projects, setProjects] = useState<Project[]>([]);
   const [wbsItems, setWbsItems] = useState<WbsItem[]>([]);
   const [selectedProjectId, setSelectedProjectId] = useState<number | ''>('');
+  const [editingWbs, setEditingWbs] = useState<WbsItem | null>(null);
+  const [form, setForm] = useState<CreateWbsPayload>(emptyForm);
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState('');
 
-  const [form, setForm] = useState<CreateWbsPayload>({
-    projectId: 0,
-    parentId: null,
-    code: '',
-    name: '',
-    description: '',
-    sortOrder: 0,
-  });
+  const isSuccess = message.toLowerCase().includes('successfully');
 
-  async function loadProjects() {
-    const data = await projectsApi.findAll();
-    setProjects(data);
+  useEffect(() => {
+    loadInitialData();
+  }, []);
 
-    if (data.length > 0) {
-      setSelectedProjectId(data[0].id);
-      setForm((prev) => ({
-        ...prev,
-        projectId: data[0].id,
-      }));
-      await loadWbs(data[0].id);
-    }
-  }
-
-  async function loadWbs(projectId: number) {
+  async function loadInitialData() {
     try {
       setLoading(true);
-      const data = await wbsApi.findByProject(projectId);
-      setWbsItems(data);
+      setMessage('');
+
+      const projectData = await projectsApi.findAll();
+      setProjects(projectData);
+
+      if (projectData.length > 0) {
+        const firstProjectId = projectData[0].id;
+
+        setSelectedProjectId(firstProjectId);
+        setForm((prev) => ({
+          ...prev,
+          projectId: firstProjectId,
+        }));
+
+        await loadWbs(firstProjectId);
+      }
     } catch (error: any) {
-      setMessage(error.response?.data?.message || 'Failed to load WBS items');
+      setMessage(error.response?.data?.message || 'Failed to load WBS data');
     } finally {
       setLoading(false);
     }
   }
 
-  useEffect(() => {
-    loadProjects();
-  }, []);
+  async function loadWbs(projectId: number) {
+    try {
+      const data = await wbsApi.findByProject(projectId);
+      setWbsItems(data);
+    } catch (error: any) {
+      setMessage(error.response?.data?.message || 'Failed to load WBS items');
+    }
+  }
 
   function updateField(
     name: keyof CreateWbsPayload,
@@ -64,46 +78,89 @@ export default function WbsPage() {
   async function handleProjectChange(value: string) {
     const projectId = Number(value);
 
-    setSelectedProjectId(projectId);
-    setForm((prev) => ({
-      ...prev,
-      projectId,
-      parentId: null,
-    }));
+    setSelectedProjectId(projectId || '');
+    setEditingWbs(null);
 
-    await loadWbs(projectId);
+    setForm({
+      ...emptyForm,
+      projectId,
+    });
+
+    if (projectId) {
+      await loadWbs(projectId);
+    } else {
+      setWbsItems([]);
+    }
   }
 
-  async function handleCreate(e: React.FormEvent) {
+  function handleEdit(item: WbsItem) {
+    setEditingWbs(item);
+
+    setForm({
+      projectId: item.projectId,
+      parentId: item.parentId ?? null,
+      code: item.code,
+      name: item.name,
+      description: item.description || '',
+      sortOrder: item.sortOrder ?? 0,
+    });
+
+    setMessage('');
+  }
+
+  function cancelEdit() {
+    setEditingWbs(null);
+
+    setForm({
+      ...emptyForm,
+      projectId: selectedProjectId ? Number(selectedProjectId) : 0,
+    });
+  }
+
+  async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
+
+    if (!form.projectId) {
+      setMessage('Select project first');
+      return;
+    }
 
     try {
       setLoading(true);
       setMessage('');
 
-      await wbsApi.create({
-        ...form,
+      const payload: CreateWbsPayload = {
         projectId: Number(form.projectId),
         parentId: form.parentId ? Number(form.parentId) : null,
+        code: form.code,
+        name: form.name,
+        description: form.description || '',
         sortOrder: Number(form.sortOrder ?? 0),
+      };
+
+      if (editingWbs) {
+        await wbsApi.update(editingWbs.id, payload);
+        setMessage('WBS item updated successfully');
+      } else {
+        await wbsApi.create(payload);
+        setMessage('WBS item created successfully');
+      }
+
+      setEditingWbs(null);
+
+      setForm({
+        ...emptyForm,
+        projectId: Number(form.projectId),
       });
 
-      setForm((prev) => ({
-        ...prev,
-        parentId: null,
-        code: '',
-        name: '',
-        description: '',
-        sortOrder: 0,
-      }));
-
-      setMessage('WBS item created successfully');
-
-      if (selectedProjectId) {
-        await loadWbs(Number(selectedProjectId));
-      }
+      await loadWbs(Number(form.projectId));
     } catch (error: any) {
-      setMessage(error.response?.data?.message || 'Failed to create WBS item');
+      setMessage(
+        error.response?.data?.message ||
+          (editingWbs
+            ? 'Failed to update WBS item'
+            : 'Failed to create WBS item'),
+      );
     } finally {
       setLoading(false);
     }
@@ -116,7 +173,10 @@ export default function WbsPage() {
 
     try {
       setLoading(true);
+      setMessage('');
+
       await wbsApi.remove(id);
+
       setMessage('WBS item deleted successfully');
 
       if (selectedProjectId) {
@@ -128,6 +188,8 @@ export default function WbsPage() {
       setLoading(false);
     }
   }
+
+  const parentOptions = wbsItems.filter((item) => item.id !== editingWbs?.id);
 
   return (
     <div>
@@ -141,104 +203,96 @@ export default function WbsPage() {
           style={{
             marginBottom: 16,
             padding: 12,
-            background: '#f9fafb',
-            border: '1px solid #e5e7eb',
             borderRadius: 8,
+            fontWeight: 600,
+            background: isSuccess ? '#dcfce7' : '#fee2e2',
+            color: isSuccess ? '#166534' : '#991b1b',
+            border: isSuccess ? '1px solid #86efac' : '1px solid #fca5a5',
           }}
         >
           {message}
         </div>
       )}
 
-        <div className="module-grid">
-        <Card title="Create WBS Item">
-          <form onSubmit={handleCreate}>
-            <div style={{ marginBottom: 12 }}>
-              <label style={{ display: 'block', marginBottom: 6, fontWeight: 600 }}>
-                Project
-              </label>
-
-              <select
+      <div className="module-grid">
+        <PermissionGuard permissions={editingWbs ? ['wbs:update'] : ['wbs:create']}>
+          <Card title={editingWbs ? `Edit WBS: ${editingWbs.code}` : 'Create WBS Item'}>
+            <form onSubmit={handleSubmit}>
+              <SelectField
+                label="Project"
                 value={form.projectId}
-                onChange={(e) => handleProjectChange(e.target.value)}
-                required
-                style={{
-                  width: '100%',
-                  padding: '10px 12px',
-                  borderRadius: 8,
-                  border: '1px solid #d1d5db',
-                }}
+                onChange={handleProjectChange}
               >
                 <option value={0}>Select project</option>
+
                 {projects.map((project) => (
                   <option key={project.id} value={project.id}>
                     {project.code} - {project.name}
                   </option>
                 ))}
-              </select>
-            </div>
+              </SelectField>
 
-            <div style={{ marginBottom: 12 }}>
-              <label style={{ display: 'block', marginBottom: 6, fontWeight: 600 }}>
-                Parent WBS
-              </label>
-
-              <select
+              <SelectField
+                label="Parent WBS"
                 value={form.parentId ?? ''}
-                onChange={(e) =>
-                  updateField(
-                    'parentId',
-                    e.target.value ? Number(e.target.value) : null,
-                  )
+                onChange={(value) =>
+                  updateField('parentId', value ? Number(value) : null)
                 }
-                style={{
-                  width: '100%',
-                  padding: '10px 12px',
-                  borderRadius: 8,
-                  border: '1px solid #d1d5db',
-                }}
               >
                 <option value="">No parent</option>
-                {wbsItems.map((item) => (
+
+                {parentOptions.map((item) => (
                   <option key={item.id} value={item.id}>
                     {item.code} - {item.name}
                   </option>
                 ))}
-              </select>
-            </div>
+              </SelectField>
 
-            <Input
-              label="WBS Code"
-              value={form.code}
-              onChange={(e) => updateField('code', e.target.value)}
-              required
-            />
+              <Input
+                label="WBS Code"
+                value={form.code}
+                onChange={(e) => updateField('code', e.target.value)}
+                required
+              />
 
-            <Input
-              label="WBS Name"
-              value={form.name}
-              onChange={(e) => updateField('name', e.target.value)}
-              required
-            />
+              <Input
+                label="WBS Name"
+                value={form.name}
+                onChange={(e) => updateField('name', e.target.value)}
+                required
+              />
 
-            <Input
-              label="Description"
-              value={form.description}
-              onChange={(e) => updateField('description', e.target.value)}
-            />
+              <Input
+                label="Description"
+                value={form.description ?? ''}
+                onChange={(e) => updateField('description', e.target.value)}
+              />
 
-            <Input
-              label="Sort Order"
-              type="number"
-              value={form.sortOrder ?? 0}
-              onChange={(e) => updateField('sortOrder', Number(e.target.value))}
-            />
+              <Input
+                label="Sort Order"
+                type="number"
+                value={form.sortOrder ?? 0}
+                onChange={(e) => updateField('sortOrder', Number(e.target.value))}
+              />
 
-            <Button disabled={loading} style={{ width: '100%' }}>
-              {loading ? 'Saving...' : 'Create WBS Item'}
-            </Button>
-          </form>
-        </Card>
+              <div style={{ display: 'flex', gap: 10 }}>
+                <Button disabled={loading} style={{ flex: 1 }}>
+                  {loading
+                    ? 'Saving...'
+                    : editingWbs
+                      ? 'Save Changes'
+                      : 'Create WBS Item'}
+                </Button>
+
+                {editingWbs && (
+                  <Button type="button" variant="secondary" onClick={cancelEdit}>
+                    Cancel
+                  </Button>
+                )}
+              </div>
+            </form>
+          </Card>
+        </PermissionGuard>
 
         <Card title="WBS List">
           {loading && <p>Loading...</p>}
@@ -268,21 +322,72 @@ export default function WbsPage() {
               {
                 header: 'Actions',
                 accessor: (row) => (
-                  <Button
-                    variant="danger"
-                    onClick={() => handleDelete(row.id)}
-                    style={{ padding: '6px 10px' }}
-                  >
-                    Delete
-                  </Button>
+                  <div style={{ display: 'flex', gap: 8 }}>
+                    <PermissionGuard permissions={['wbs:update']}>
+                      <Button
+                        variant="secondary"
+                        onClick={() => handleEdit(row)}
+                        style={{ padding: '6px 10px' }}
+                      >
+                        Edit
+                      </Button>
+                    </PermissionGuard>
+
+                    <PermissionGuard permissions={['wbs:delete']}>
+                      <Button
+                        variant="danger"
+                        onClick={() => handleDelete(row.id)}
+                        style={{ padding: '6px 10px' }}
+                      >
+                        Delete
+                      </Button>
+                    </PermissionGuard>
+                  </div>
                 ),
               },
             ]}
             data={wbsItems}
-            emptyMessage="No WBS items found"
+            emptyMessage={
+              selectedProjectId
+                ? 'No WBS items found'
+                : 'Select a project to view WBS items'
+            }
           />
         </Card>
       </div>
+    </div>
+  );
+}
+
+function SelectField({
+  label,
+  value,
+  onChange,
+  children,
+}: {
+  label: string;
+  value?: string | number | null;
+  onChange: (value: string) => void;
+  children: React.ReactNode;
+}) {
+  return (
+    <div style={{ marginBottom: 12 }}>
+      <label style={{ display: 'block', marginBottom: 6, fontWeight: 600 }}>
+        {label}
+      </label>
+
+      <select
+        value={value ?? ''}
+        onChange={(e) => onChange(e.target.value)}
+        style={{
+          width: '100%',
+          padding: '10px 12px',
+          borderRadius: 8,
+          border: '1px solid #d1d5db',
+        }}
+      >
+        {children}
+      </select>
     </div>
   );
 }

@@ -1,48 +1,67 @@
 import { useEffect, useState } from 'react';
+
 import { projectsApi } from '../../api/projects.api';
 import type { Project } from '../../api/projects.api';
 import { tasksApi } from '../../api/tasks.api';
 import type { CreateTaskPayload, Task } from '../../api/tasks.api';
 import { wbsApi } from '../../api/wbs.api';
 import type { WbsItem } from '../../api/wbs.api';
+
+import PermissionGuard from '../../components/auth/PermissionGuard';
 import { Button, Card, DataTable, Input, PageHeader } from '../../components/ui';
+
+const emptyForm: CreateTaskPayload = {
+  projectId: 0,
+  wbsItemId: null,
+  parentTaskId: null,
+  code: '',
+  name: '',
+  description: '',
+  status: 'NOT_STARTED',
+  priority: 'MEDIUM',
+  plannedStart: '',
+  plannedEnd: '',
+  durationDays: undefined,
+  progress: 0,
+};
 
 export default function TasksPage() {
   const [projects, setProjects] = useState<Project[]>([]);
   const [wbsItems, setWbsItems] = useState<WbsItem[]>([]);
   const [tasks, setTasks] = useState<Task[]>([]);
   const [selectedProjectId, setSelectedProjectId] = useState<number | ''>('');
+  const [editingTask, setEditingTask] = useState<Task | null>(null);
+
+  const [form, setForm] = useState<CreateTaskPayload>(emptyForm);
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState('');
 
-  const [form, setForm] = useState<CreateTaskPayload>({
-    projectId: 0,
-    wbsItemId: null,
-    parentTaskId: null,
-    code: '',
-    name: '',
-    description: '',
-    status: 'NOT_STARTED',
-    priority: 'MEDIUM',
-    plannedStart: '',
-    plannedEnd: '',
-    durationDays: undefined,
-    progress: 0,
-  });
+  const isSuccess = message.toLowerCase().includes('successfully');
+
+  useEffect(() => {
+    loadProjects();
+  }, []);
 
   async function loadProjects() {
-    const data = await projectsApi.findAll();
-    setProjects(data);
+    try {
+      setLoading(true);
+      setMessage('');
 
-    if (data.length > 0) {
-      await handleProjectChange(String(data[0].id));
+      const data = await projectsApi.findAll();
+      setProjects(data);
+
+      if (data.length > 0) {
+        await handleProjectChange(String(data[0].id));
+      }
+    } catch (error: any) {
+      setMessage(error.response?.data?.message || 'Failed to load projects');
+    } finally {
+      setLoading(false);
     }
   }
 
   async function loadProjectData(projectId: number) {
     try {
-      setLoading(true);
-
       const [wbsData, taskData] = await Promise.all([
         wbsApi.findByProject(projectId),
         tasksApi.findByProject(projectId),
@@ -52,14 +71,8 @@ export default function TasksPage() {
       setTasks(taskData);
     } catch (error: any) {
       setMessage(error.response?.data?.message || 'Failed to load project tasks');
-    } finally {
-      setLoading(false);
     }
   }
-
-  useEffect(() => {
-    loadProjects();
-  }, []);
 
   function updateField(
     name: keyof CreateTaskPayload,
@@ -74,80 +87,142 @@ export default function TasksPage() {
   async function handleProjectChange(value: string) {
     const projectId = Number(value);
 
-    setSelectedProjectId(projectId);
+    setSelectedProjectId(projectId || '');
+    setEditingTask(null);
 
-    setForm((prev) => ({
-      ...prev,
+    setForm({
+      ...emptyForm,
       projectId,
-      wbsItemId: null,
-      parentTaskId: null,
-    }));
+    });
 
-    await loadProjectData(projectId);
+    if (projectId) {
+      await loadProjectData(projectId);
+    } else {
+      setWbsItems([]);
+      setTasks([]);
+    }
   }
 
-  async function handleCreate(e: React.FormEvent) {
+  function handleEdit(task: Task) {
+    setEditingTask(task);
+
+    setForm({
+      projectId: task.projectId,
+      wbsItemId: task.wbsItemId ?? null,
+      parentTaskId: task.parentTaskId ?? null,
+      code: task.code,
+      name: task.name,
+      description: task.description || '',
+      status: task.status,
+      priority: task.priority,
+      plannedStart: task.plannedStart?.slice(0, 10) || '',
+      plannedEnd: task.plannedEnd?.slice(0, 10) || '',
+      durationDays: task.durationDays ?? undefined,
+      progress: task.progress ?? 0,
+    });
+
+    setMessage('');
+  }
+
+  function cancelEdit() {
+    setEditingTask(null);
+
+    setForm({
+      ...emptyForm,
+      projectId: selectedProjectId ? Number(selectedProjectId) : 0,
+    });
+  }
+
+  async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
+
+    if (!form.projectId) {
+      setMessage('Select project first');
+      return;
+    }
 
     try {
       setLoading(true);
       setMessage('');
 
-      await tasksApi.create({
+      const payload: CreateTaskPayload = {
         ...form,
         projectId: Number(form.projectId),
         wbsItemId: form.wbsItemId ? Number(form.wbsItemId) : null,
         parentTaskId: form.parentTaskId ? Number(form.parentTaskId) : null,
         durationDays: form.durationDays ? Number(form.durationDays) : undefined,
         progress: form.progress ? Number(form.progress) : 0,
+      };
+
+      if (editingTask) {
+        await tasksApi.update(editingTask.id, payload);
+        setMessage('Task updated successfully');
+      } else {
+        await tasksApi.create(payload);
+        setMessage('Task created successfully');
+      }
+
+      setEditingTask(null);
+
+      setForm({
+        ...emptyForm,
+        projectId: Number(form.projectId),
       });
 
-      setForm((prev) => ({
-        ...prev,
-        wbsItemId: null,
-        parentTaskId: null,
-        code: '',
-        name: '',
-        description: '',
-        status: 'NOT_STARTED',
-        priority: 'MEDIUM',
-        plannedStart: '',
-        plannedEnd: '',
-        durationDays: undefined,
-        progress: 0,
-      }));
-
-      setMessage('Task created successfully');
-
-      if (selectedProjectId) {
-        await loadProjectData(Number(selectedProjectId));
-      }
+      await loadProjectData(Number(form.projectId));
     } catch (error: any) {
-      setMessage(error.response?.data?.message || 'Failed to create task');
+      setMessage(
+        error.response?.data?.message ||
+          (editingTask ? 'Failed to update task' : 'Failed to create task'),
+      );
     } finally {
       setLoading(false);
     }
   }
 
-  async function handleDelete(id: number) {
-    const confirmed = window.confirm('Cancel this task?');
+  async function handleDeactivate(id: number) {
+    const confirmed = window.confirm('Deactivate this task?');
 
     if (!confirmed) return;
 
     try {
       setLoading(true);
+      setMessage('');
+
       await tasksApi.remove(id);
-      setMessage('Task cancelled successfully');
+
+      setMessage('Task deactivated successfully');
 
       if (selectedProjectId) {
         await loadProjectData(Number(selectedProjectId));
       }
     } catch (error: any) {
-      setMessage(error.response?.data?.message || 'Failed to cancel task');
+      setMessage(error.response?.data?.message || 'Failed to deactivate task');
     } finally {
       setLoading(false);
     }
   }
+
+  async function handleActivate(id: number) {
+    try {
+      setLoading(true);
+      setMessage('');
+
+      await tasksApi.activate(id);
+
+      setMessage('Task activated successfully');
+
+      if (selectedProjectId) {
+        await loadProjectData(Number(selectedProjectId));
+      }
+    } catch (error: any) {
+      setMessage(error.response?.data?.message || 'Failed to activate task');
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  const parentTaskOptions = tasks.filter((task) => task.id !== editingTask?.id);
 
   return (
     <div>
@@ -161,172 +236,182 @@ export default function TasksPage() {
           style={{
             marginBottom: 16,
             padding: 12,
-            background: '#f9fafb',
-            border: '1px solid #e5e7eb',
             borderRadius: 8,
+            fontWeight: 600,
+            background: isSuccess ? '#dcfce7' : '#fee2e2',
+            color: isSuccess ? '#166534' : '#991b1b',
+            border: isSuccess ? '1px solid #86efac' : '1px solid #fca5a5',
           }}
         >
           {message}
         </div>
       )}
 
-        <div className="module-grid">
+      <div className="module-grid">
+        <PermissionGuard permissions={editingTask ? ['tasks:update'] : ['tasks:create']}>
+          <Card title={editingTask ? `Edit Task: ${editingTask.code}` : 'Create Task'}>
+            <form onSubmit={handleSubmit}>
+              <SelectField
+                label="Project"
+                value={form.projectId}
+                onChange={handleProjectChange}
+              >
+                <option value={0}>Select project</option>
 
-        <Card title="Create Task">
-          <form onSubmit={handleCreate}>
-            <SelectField
-              label="Project"
-              value={form.projectId}
-              onChange={(value) => handleProjectChange(value)}
-            >
-              <option value={0}>Select project</option>
-              {projects.map((project) => (
-                <option key={project.id} value={project.id}>
-                  {project.code} - {project.name}
-                </option>
-              ))}
-            </SelectField>
+                {projects.map((project) => (
+                  <option key={project.id} value={project.id}>
+                    {project.code} - {project.name}
+                  </option>
+                ))}
+              </SelectField>
 
-            <SelectField
-              label="WBS Item"
-              value={form.wbsItemId ?? ''}
-              onChange={(value) =>
-                updateField('wbsItemId', value ? Number(value) : null)
-              }
-            >
-              <option value="">No WBS item</option>
-              {wbsItems.map((item) => (
-                <option key={item.id} value={item.id}>
-                  {item.code} - {item.name}
-                </option>
-              ))}
-            </SelectField>
+              <SelectField
+                label="WBS Item"
+                value={form.wbsItemId ?? ''}
+                onChange={(value) =>
+                  updateField('wbsItemId', value ? Number(value) : null)
+                }
+              >
+                <option value="">No WBS item</option>
 
-            <SelectField
-              label="Parent Task"
-              value={form.parentTaskId ?? ''}
-              onChange={(value) =>
-                updateField('parentTaskId', value ? Number(value) : null)
-              }
-            >
-              <option value="">No parent task</option>
-              {tasks.map((task) => (
-                <option key={task.id} value={task.id}>
-                  {task.code} - {task.name}
-                </option>
-              ))}
-            </SelectField>
+                {wbsItems.map((item) => (
+                  <option key={item.id} value={item.id}>
+                    {item.code} - {item.name}
+                  </option>
+                ))}
+              </SelectField>
 
-            <Input
-              label="Task Code"
-              value={form.code}
-              onChange={(e) => updateField('code', e.target.value)}
-              required
-            />
+              <SelectField
+                label="Parent Task"
+                value={form.parentTaskId ?? ''}
+                onChange={(value) =>
+                  updateField('parentTaskId', value ? Number(value) : null)
+                }
+              >
+                <option value="">No parent task</option>
 
-            <Input
-              label="Task Name"
-              value={form.name}
-              onChange={(e) => updateField('name', e.target.value)}
-              required
-            />
+                {parentTaskOptions.map((task) => (
+                  <option key={task.id} value={task.id}>
+                    {task.code} - {task.name}
+                  </option>
+                ))}
+              </SelectField>
 
-            <Input
-              label="Description"
-              value={form.description}
-              onChange={(e) => updateField('description', e.target.value)}
-            />
+              <Input
+                label="Task Code"
+                value={form.code}
+                onChange={(e) => updateField('code', e.target.value)}
+                required
+              />
 
-            <SelectField
-              label="Status"
-              value={form.status ?? 'NOT_STARTED'}
-              onChange={(value) => updateField('status', value)}
-            >
-              <option value="NOT_STARTED">Not Started</option>
-              <option value="IN_PROGRESS">In Progress</option>
-              <option value="ON_HOLD">On Hold</option>
-              <option value="COMPLETED">Completed</option>
-              <option value="CANCELLED">Cancelled</option>
-            </SelectField>
+              <Input
+                label="Task Name"
+                value={form.name}
+                onChange={(e) => updateField('name', e.target.value)}
+                required
+              />
 
-            <SelectField
-              label="Priority"
-              value={form.priority ?? 'MEDIUM'}
-              onChange={(value) => updateField('priority', value)}
-            >
-              <option value="LOW">Low</option>
-              <option value="MEDIUM">Medium</option>
-              <option value="HIGH">High</option>
-              <option value="CRITICAL">Critical</option>
-            </SelectField>
+              <Input
+                label="Description"
+                value={form.description ?? ''}
+                onChange={(e) => updateField('description', e.target.value)}
+              />
 
-            <Input
-              label="Planned Start"
-              type="date"
-              value={form.plannedStart}
-              onChange={(e) => updateField('plannedStart', e.target.value)}
-            />
+              <SelectField
+                label="Status"
+                value={form.status ?? 'NOT_STARTED'}
+                onChange={(value) => updateField('status', value)}
+              >
+                <option value="NOT_STARTED">Not Started</option>
+                <option value="IN_PROGRESS">In Progress</option>
+                <option value="ON_HOLD">On Hold</option>
+                <option value="COMPLETED">Completed</option>
+                <option value="CANCELLED">Cancelled</option>
+              </SelectField>
 
-            <Input
-              label="Planned End"
-              type="date"
-              value={form.plannedEnd}
-              onChange={(e) => updateField('plannedEnd', e.target.value)}
-            />
+              <SelectField
+                label="Priority"
+                value={form.priority ?? 'MEDIUM'}
+                onChange={(value) => updateField('priority', value)}
+              >
+                <option value="LOW">Low</option>
+                <option value="MEDIUM">Medium</option>
+                <option value="HIGH">High</option>
+                <option value="CRITICAL">Critical</option>
+              </SelectField>
 
-            <Input
-              label="Duration Days"
-              type="number"
-              value={form.durationDays ?? ''}
-              onChange={(e) =>
-                updateField(
-                  'durationDays',
-                  e.target.value ? Number(e.target.value) : undefined,
-                )
-              }
-            />
+              <Input
+                label="Planned Start"
+                type="date"
+                value={form.plannedStart ?? ''}
+                onChange={(e) => updateField('plannedStart', e.target.value)}
+              />
 
-            <Input
-              label="Progress %"
-              type="number"
-              min={0}
-              max={100}
-              value={form.progress ?? 0}
-              onChange={(e) => updateField('progress', Number(e.target.value))}
-            />
+              <Input
+                label="Planned End"
+                type="date"
+                value={form.plannedEnd ?? ''}
+                onChange={(e) => updateField('plannedEnd', e.target.value)}
+              />
 
-            <Button disabled={loading} style={{ width: '100%' }}>
-              {loading ? 'Saving...' : 'Create Task'}
-            </Button>
-          </form>
-        </Card>
+              <Input
+                label="Duration Days"
+                type="number"
+                value={form.durationDays ?? ''}
+                onChange={(e) =>
+                  updateField(
+                    'durationDays',
+                    e.target.value ? Number(e.target.value) : undefined,
+                  )
+                }
+              />
+
+              <Input
+                label="Progress %"
+                type="number"
+                min={0}
+                max={100}
+                value={form.progress ?? 0}
+                onChange={(e) => updateField('progress', Number(e.target.value))}
+              />
+
+              <div style={{ display: 'flex', gap: 10 }}>
+                <Button disabled={loading} style={{ flex: 1 }}>
+                  {loading
+                    ? 'Saving...'
+                    : editingTask
+                      ? 'Save Changes'
+                      : 'Create Task'}
+                </Button>
+
+                {editingTask && (
+                  <Button type="button" variant="secondary" onClick={cancelEdit}>
+                    Cancel
+                  </Button>
+                )}
+              </div>
+            </form>
+          </Card>
+        </PermissionGuard>
 
         <Card title="Task List">
           {loading && <p>Loading...</p>}
 
           <DataTable<Task>
             columns={[
-              {
-                header: 'Code',
-                accessor: 'code',
-              },
-              {
-                header: 'Name',
-                accessor: 'name',
-              },
+              { header: 'Code', accessor: 'code' },
+              { header: 'Name', accessor: 'name' },
               {
                 header: 'WBS',
                 accessor: (row) =>
                   row.wbsItem ? `${row.wbsItem.code} - ${row.wbsItem.name}` : '-',
               },
+              { header: 'Status', accessor: 'status' },
               {
-                header: 'Status',
-                accessor: 'status',
+                header: 'Active',
+                accessor: (row) => (row.isActive ? 'Yes' : 'No'),
               },
-              {
-                header: 'Priority',
-                accessor: 'priority',
-              },
+              { header: 'Priority', accessor: 'priority' },
               {
                 header: 'Progress',
                 accessor: (row) => `${Number(row.progress)}%`,
@@ -339,13 +424,38 @@ export default function TasksPage() {
               {
                 header: 'Actions',
                 accessor: (row) => (
-                  <Button
-                    variant="danger"
-                    onClick={() => handleDelete(row.id)}
-                    style={{ padding: '6px 10px' }}
-                  >
-                    Cancel
-                  </Button>
+                  <div style={{ display: 'flex', gap: 8 }}>
+                    <PermissionGuard permissions={['tasks:update']}>
+                      <Button
+                        variant="secondary"
+                        onClick={() => handleEdit(row)}
+                        style={{ padding: '6px 10px' }}
+                      >
+                        Edit
+                      </Button>
+                    </PermissionGuard>
+
+                    {row.isActive ? (
+                      <PermissionGuard permissions={['tasks:delete']}>
+                        <Button
+                          variant="danger"
+                          onClick={() => handleDeactivate(row.id)}
+                          style={{ padding: '6px 10px' }}
+                        >
+                          Deactivate
+                        </Button>
+                      </PermissionGuard>
+                    ) : (
+                      <PermissionGuard permissions={['tasks:update']}>
+                        <Button
+                          onClick={() => handleActivate(row.id)}
+                          style={{ padding: '6px 10px' }}
+                        >
+                          Activate
+                        </Button>
+                      </PermissionGuard>
+                    )}
+                  </div>
                 ),
               },
             ]}
@@ -365,7 +475,7 @@ function SelectField({
   children,
 }: {
   label: string;
-  value: string | number;
+  value?: string | number | null;
   onChange: (value: string) => void;
   children: React.ReactNode;
 }) {
@@ -376,7 +486,7 @@ function SelectField({
       </label>
 
       <select
-        value={value}
+        value={value ?? ''}
         onChange={(e) => onChange(e.target.value)}
         style={{
           width: '100%',

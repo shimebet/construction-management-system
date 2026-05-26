@@ -47,16 +47,14 @@ export const projectsApi = {
     return response.data;
   },
 
-  update: async (
-    id: number,
-    data: Partial<CreateProjectPayload>,
-  ): Promise<Project> => {
-    const response = await api.patch(`/projects/${id}`, data);
-    return response.data;
-  },
+update: async (id: number, data: Partial<CreateProjectPayload>) => {
+  const response = await api.patch(`/projects/${id}`, data);
+  return response.data;
+},
 
-  remove: async (id: number): Promise<Project> => {
-    const response = await api.delete(`/projects/${id}`);
-    return response.data;
-  },
+remove: async (id: number) => {
+  const response = await api.delete(`/projects/${id}`);
+  return response.data;
+},
+
 };

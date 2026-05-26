@@ -1,6 +1,7 @@
 import { api } from './client';
 
 export type Milestone = {
+  isActive: any;
   id: number;
   projectId: number;
   code: string;
@@ -32,16 +33,18 @@ export const milestonesApi = {
     return response.data;
   },
 
-  update: async (
-    id: number,
-    data: Partial<CreateMilestonePayload>,
-  ): Promise<Milestone> => {
-    const response = await api.patch(`/milestones/${id}`, data);
-    return response.data;
-  },
+update: async (id: number, data: Partial<CreateMilestonePayload>) => {
+  const response = await api.patch(`/milestones/${id}`, data);
+  return response.data;
+},
 
-  remove: async (id: number): Promise<Milestone> => {
-    const response = await api.delete(`/milestones/${id}`);
-    return response.data;
-  },
+remove: async (id: number) => {
+  const response = await api.delete(`/milestones/${id}`);
+  return response.data;
+},
+
+activate: async (id: number) => {
+  const response = await api.patch(`/milestones/${id}/activate`);
+  return response.data;
+},
 };

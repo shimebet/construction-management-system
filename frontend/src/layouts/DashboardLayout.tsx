@@ -3,6 +3,7 @@ import { Link, NavLink, Outlet } from 'react-router-dom';
 import { authApi } from '../api/auth.api';
 import type { AuthMe } from '../api/auth.api';
 import { notificationsApi } from '../api/notifications.api';
+import { LogOut } from 'lucide-react';
 
 const menuItems = [
   {
@@ -243,11 +244,15 @@ function logout() {
           ))}
         </nav>
 
-        <div className="sidebar-footer">
-          <button className="logout-button" onClick={logout}>
-            Logout
-          </button>
-        </div>
+<div className="sidebar-footer">
+  <button
+    className="logout-button"
+    onClick={logout}
+    title="Logout"
+  >
+    <LogOut size={18} />
+  </button>
+</div>
       </aside>
 
       <main className="main-content">
@@ -294,9 +299,13 @@ function logout() {
               </span>
             </Link>
 
-            <button className="topbar-logout" onClick={logout}>
-              Logout
-            </button>
+<button
+  className="topbar-logout"
+  onClick={logout}
+  title="Logout"
+>
+  <LogOut size={18} />
+</button>
           </div>
         </header>
 

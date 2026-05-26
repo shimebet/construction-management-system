@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+
 import { milestonesApi } from '../../api/milestones.api';
 import type {
   CreateMilestonePayload,
@@ -6,49 +7,62 @@ import type {
 } from '../../api/milestones.api';
 import { projectsApi } from '../../api/projects.api';
 import type { Project } from '../../api/projects.api';
+
+import PermissionGuard from '../../components/auth/PermissionGuard';
 import { Button, Card, DataTable, Input, PageHeader } from '../../components/ui';
+
+const emptyForm: CreateMilestonePayload = {
+  projectId: 0,
+  code: '',
+  name: '',
+  description: '',
+  plannedDate: '',
+  actualDate: '',
+  status: 'PLANNED',
+};
 
 export default function MilestonesPage() {
   const [projects, setProjects] = useState<Project[]>([]);
   const [milestones, setMilestones] = useState<Milestone[]>([]);
   const [selectedProjectId, setSelectedProjectId] = useState<number | ''>('');
+  const [editingMilestone, setEditingMilestone] = useState<Milestone | null>(null);
+
+  const [form, setForm] = useState<CreateMilestonePayload>(emptyForm);
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState('');
 
-  const [form, setForm] = useState<CreateMilestonePayload>({
-    projectId: 0,
-    code: '',
-    name: '',
-    description: '',
-    plannedDate: '',
-    actualDate: '',
-    status: 'PLANNED',
-  });
+  const isSuccess = message.toLowerCase().includes('successfully');
+
+  useEffect(() => {
+    loadProjects();
+  }, []);
 
   async function loadProjects() {
-    const data = await projectsApi.findAll();
-    setProjects(data);
-
-    if (data.length > 0) {
-      await handleProjectChange(String(data[0].id));
-    }
-  }
-
-  async function loadMilestones(projectId: number) {
     try {
       setLoading(true);
-      const data = await milestonesApi.findByProject(projectId);
-      setMilestones(data);
+      setMessage('');
+
+      const data = await projectsApi.findAll();
+      setProjects(data);
+
+      if (data.length > 0) {
+        await handleProjectChange(String(data[0].id));
+      }
     } catch (error: any) {
-      setMessage(error.response?.data?.message || 'Failed to load milestones');
+      setMessage(error.response?.data?.message || 'Failed to load projects');
     } finally {
       setLoading(false);
     }
   }
 
-  useEffect(() => {
-    loadProjects();
-  }, []);
+  async function loadMilestones(projectId: number) {
+    try {
+      const data = await milestonesApi.findByProject(projectId);
+      setMilestones(data);
+    } catch (error: any) {
+      setMessage(error.response?.data?.message || 'Failed to load milestones');
+    }
+  }
 
   function updateField(
     name: keyof CreateMilestonePayload,
@@ -63,66 +77,129 @@ export default function MilestonesPage() {
   async function handleProjectChange(value: string) {
     const projectId = Number(value);
 
-    setSelectedProjectId(projectId);
+    setSelectedProjectId(projectId || '');
+    setEditingMilestone(null);
 
-    setForm((prev) => ({
-      ...prev,
+    setForm({
+      ...emptyForm,
       projectId,
-    }));
+    });
 
-    await loadMilestones(projectId);
+    if (projectId) {
+      await loadMilestones(projectId);
+    } else {
+      setMilestones([]);
+    }
   }
 
-  async function handleCreate(e: React.FormEvent) {
+  function handleEdit(milestone: Milestone) {
+    setEditingMilestone(milestone);
+
+    setForm({
+      projectId: milestone.projectId,
+      code: milestone.code,
+      name: milestone.name,
+      description: milestone.description || '',
+      plannedDate: milestone.plannedDate?.slice(0, 10) || '',
+      actualDate: milestone.actualDate?.slice(0, 10) || '',
+      status: milestone.status || 'PLANNED',
+    });
+
+    setMessage('');
+  }
+
+  function cancelEdit() {
+    setEditingMilestone(null);
+
+    setForm({
+      ...emptyForm,
+      projectId: selectedProjectId ? Number(selectedProjectId) : 0,
+    });
+  }
+
+  async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
+
+    if (!form.projectId) {
+      setMessage('Select project first');
+      return;
+    }
 
     try {
       setLoading(true);
       setMessage('');
 
-      await milestonesApi.create({
+      const payload: CreateMilestonePayload = {
         ...form,
         projectId: Number(form.projectId),
         actualDate: form.actualDate || undefined,
+      };
+
+      if (editingMilestone) {
+        await milestonesApi.update(editingMilestone.id, payload);
+        setMessage('Milestone updated successfully');
+      } else {
+        await milestonesApi.create(payload);
+        setMessage('Milestone created successfully');
+      }
+
+      setEditingMilestone(null);
+
+      setForm({
+        ...emptyForm,
+        projectId: Number(form.projectId),
       });
 
-      setForm((prev) => ({
-        ...prev,
-        code: '',
-        name: '',
-        description: '',
-        plannedDate: '',
-        actualDate: '',
-        status: 'PLANNED',
-      }));
-
-      setMessage('Milestone created successfully');
-
-      if (selectedProjectId) {
-        await loadMilestones(Number(selectedProjectId));
-      }
+      await loadMilestones(Number(form.projectId));
     } catch (error: any) {
-      setMessage(error.response?.data?.message || 'Failed to create milestone');
+      setMessage(
+        error.response?.data?.message ||
+          (editingMilestone
+            ? 'Failed to update milestone'
+            : 'Failed to create milestone'),
+      );
     } finally {
       setLoading(false);
     }
   }
 
-  async function handleDelete(id: number) {
-    const confirmed = window.confirm('Cancel this milestone?');
+  async function handleDeactivate(id: number) {
+    const confirmed = window.confirm('Deactivate this milestone?');
 
     if (!confirmed) return;
 
     try {
       setLoading(true);
+      setMessage('');
+
       await milestonesApi.remove(id);
-      setMessage('Milestone cancelled successfully');
+
+      setMessage('Milestone deactivated successfully');
 
       if (selectedProjectId) {
         await loadMilestones(Number(selectedProjectId));
       }
     } catch (error: any) {
-      setMessage(error.response?.data?.message || 'Failed to cancel milestone');
+      setMessage(error.response?.data?.message || 'Failed to deactivate milestone');
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function handleActivate(id: number) {
+    try {
+      setLoading(true);
+      setMessage('');
+
+      await milestonesApi.activate(id);
+
+      setMessage('Milestone activated successfully');
+
+      if (selectedProjectId) {
+        await loadMilestones(Number(selectedProjectId));
+      }
+    } catch (error: any) {
+      setMessage(error.response?.data?.message || 'Failed to activate milestone');
     } finally {
       setLoading(false);
     }
@@ -140,96 +217,115 @@ export default function MilestonesPage() {
           style={{
             marginBottom: 16,
             padding: 12,
-            background: '#f9fafb',
-            border: '1px solid #e5e7eb',
             borderRadius: 8,
+            fontWeight: 600,
+            background: isSuccess ? '#dcfce7' : '#fee2e2',
+            color: isSuccess ? '#166534' : '#991b1b',
+            border: isSuccess ? '1px solid #86efac' : '1px solid #fca5a5',
           }}
         >
           {message}
         </div>
       )}
 
-        <div className="module-grid">
-        <Card title="Create Milestone">
-          <form onSubmit={handleCreate}>
-            <SelectField
-              label="Project"
-              value={form.projectId}
-              onChange={(value) => handleProjectChange(value)}
-            >
-              <option value={0}>Select project</option>
-              {projects.map((project) => (
-                <option key={project.id} value={project.id}>
-                  {project.code} - {project.name}
-                </option>
-              ))}
-            </SelectField>
+      <div className="module-grid">
+        <PermissionGuard
+          permissions={editingMilestone ? ['milestones:update'] : ['milestones:create']}
+        >
+          <Card
+            title={
+              editingMilestone
+                ? `Edit Milestone: ${editingMilestone.code}`
+                : 'Create Milestone'
+            }
+          >
+            <form onSubmit={handleSubmit}>
+              <SelectField
+                label="Project"
+                value={form.projectId}
+                onChange={handleProjectChange}
+              >
+                <option value={0}>Select project</option>
 
-            <Input
-              label="Milestone Code"
-              value={form.code}
-              onChange={(e) => updateField('code', e.target.value)}
-              required
-            />
+                {projects.map((project) => (
+                  <option key={project.id} value={project.id}>
+                    {project.code} - {project.name}
+                  </option>
+                ))}
+              </SelectField>
 
-            <Input
-              label="Milestone Name"
-              value={form.name}
-              onChange={(e) => updateField('name', e.target.value)}
-              required
-            />
+              <Input
+                label="Milestone Code"
+                value={form.code}
+                onChange={(e) => updateField('code', e.target.value)}
+                required
+              />
 
-            <Input
-              label="Description"
-              value={form.description}
-              onChange={(e) => updateField('description', e.target.value)}
-            />
+              <Input
+                label="Milestone Name"
+                value={form.name}
+                onChange={(e) => updateField('name', e.target.value)}
+                required
+              />
 
-            <Input
-              label="Planned Date"
-              type="date"
-              value={form.plannedDate}
-              onChange={(e) => updateField('plannedDate', e.target.value)}
-              required
-            />
+              <Input
+                label="Description"
+                value={form.description ?? ''}
+                onChange={(e) => updateField('description', e.target.value)}
+              />
 
-            <Input
-              label="Actual Date"
-              type="date"
-              value={form.actualDate}
-              onChange={(e) => updateField('actualDate', e.target.value)}
-            />
+              <Input
+                label="Planned Date"
+                type="date"
+                value={form.plannedDate}
+                onChange={(e) => updateField('plannedDate', e.target.value)}
+                required
+              />
 
-            <SelectField
-              label="Status"
-              value={form.status ?? 'PLANNED'}
-              onChange={(value) => updateField('status', value)}
-            >
-              <option value="PLANNED">Planned</option>
-              <option value="ACHIEVED">Achieved</option>
-              <option value="DELAYED">Delayed</option>
-              <option value="CANCELLED">Cancelled</option>
-            </SelectField>
+              <Input
+                label="Actual Date"
+                type="date"
+                value={form.actualDate ?? ''}
+                onChange={(e) => updateField('actualDate', e.target.value)}
+              />
 
-            <Button disabled={loading} style={{ width: '100%' }}>
-              {loading ? 'Saving...' : 'Create Milestone'}
-            </Button>
-          </form>
-        </Card>
+              <SelectField
+                label="Status"
+                value={form.status ?? 'PLANNED'}
+                onChange={(value) => updateField('status', value)}
+              >
+                <option value="PLANNED">Planned</option>
+                <option value="ACHIEVED">Achieved</option>
+                <option value="DELAYED">Delayed</option>
+                <option value="CANCELLED">Cancelled</option>
+              </SelectField>
+
+              <div style={{ display: 'flex', gap: 10 }}>
+                <Button disabled={loading} style={{ flex: 1 }}>
+                  {loading
+                    ? 'Saving...'
+                    : editingMilestone
+                      ? 'Save Changes'
+                      : 'Create Milestone'}
+                </Button>
+
+                {editingMilestone && (
+                  <Button type="button" variant="secondary" onClick={cancelEdit}>
+                    Cancel
+                  </Button>
+                )}
+              </div>
+            </form>
+          </Card>
+        </PermissionGuard>
 
         <Card title="Milestone List">
           {loading && <p>Loading...</p>}
 
           <DataTable<Milestone>
             columns={[
-              {
-                header: 'Code',
-                accessor: 'code',
-              },
-              {
-                header: 'Name',
-                accessor: 'name',
-              },
+              { header: 'Code', accessor: 'code' },
+              { header: 'Name', accessor: 'name' },
               {
                 header: 'Planned',
                 accessor: (row) => formatDate(row.plannedDate),
@@ -238,9 +334,10 @@ export default function MilestonesPage() {
                 header: 'Actual',
                 accessor: (row) => formatDate(row.actualDate),
               },
+              { header: 'Status', accessor: 'status' },
               {
-                header: 'Status',
-                accessor: 'status',
+                header: 'Active',
+                accessor: (row) => (row.isActive ? 'Yes' : 'No'),
               },
               {
                 header: 'Description',
@@ -249,13 +346,38 @@ export default function MilestonesPage() {
               {
                 header: 'Actions',
                 accessor: (row) => (
-                  <Button
-                    variant="danger"
-                    onClick={() => handleDelete(row.id)}
-                    style={{ padding: '6px 10px' }}
-                  >
-                    Cancel
-                  </Button>
+                  <div style={{ display: 'flex', gap: 8 }}>
+                    <PermissionGuard permissions={['milestones:update']}>
+                      <Button
+                        variant="secondary"
+                        onClick={() => handleEdit(row)}
+                        style={{ padding: '6px 10px' }}
+                      >
+                        Edit
+                      </Button>
+                    </PermissionGuard>
+
+                    {row.isActive ? (
+                      <PermissionGuard permissions={['milestones:delete']}>
+                        <Button
+                          variant="danger"
+                          onClick={() => handleDeactivate(row.id)}
+                          style={{ padding: '6px 10px' }}
+                        >
+                          Deactivate
+                        </Button>
+                      </PermissionGuard>
+                    ) : (
+                      <PermissionGuard permissions={['milestones:update']}>
+                        <Button
+                          onClick={() => handleActivate(row.id)}
+                          style={{ padding: '6px 10px' }}
+                        >
+                          Activate
+                        </Button>
+                      </PermissionGuard>
+                    )}
+                  </div>
                 ),
               },
             ]}
@@ -275,7 +397,7 @@ function SelectField({
   children,
 }: {
   label: string;
-  value: string | number;
+  value?: string | number | null;
   onChange: (value: string) => void;
   children: React.ReactNode;
 }) {
@@ -286,7 +408,7 @@ function SelectField({
       </label>
 
       <select
-        value={value}
+        value={value ?? ''}
         onChange={(e) => onChange(e.target.value)}
         style={{
           width: '100%',
