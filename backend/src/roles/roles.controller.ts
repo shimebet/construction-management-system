@@ -5,7 +5,9 @@ import {
   Get,
   Param,
   ParseIntPipe,
+  Patch,
   Post,
+  Put,
   UseGuards,
 } from '@nestjs/common';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
@@ -45,7 +47,13 @@ export class RolesController {
   ) {
     return this.rolesService.assignPermission(roleId, dto);
   }
-
+@Put(':id/permissions')
+syncPermissions(
+  @Param('id', ParseIntPipe) id: number,
+  @Body('permissionIds') permissionIds: number[],
+) {
+  return this.rolesService.syncPermissions(id, permissionIds);
+}
   @Delete(':id/permissions/:permissionId')
   removePermission(
     @Param('id', ParseIntPipe) roleId: number,
