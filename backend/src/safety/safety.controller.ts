@@ -1,6 +1,7 @@
 import {
   Body,
   Controller,
+  Delete,
   Get,
   Param,
   ParseIntPipe,
@@ -35,6 +36,11 @@ export class SafetyController {
     return this.safetyService.findIncidents(projectId);
   }
 
+  @Get('incidents/:id')
+  findIncident(@Param('id', ParseIntPipe) id: number) {
+    return this.safetyService.findIncident(id);
+  }
+
   @Patch('incidents/:id')
   updateIncident(
     @Param('id', ParseIntPipe) id: number,
@@ -44,17 +50,34 @@ export class SafetyController {
     return this.safetyService.updateIncident(id, dto, Number(user.sub));
   }
 
+  @Patch('incidents/:id/close')
+  closeIncident(@Param('id', ParseIntPipe) id: number, @CurrentUser() user: any) {
+    return this.safetyService.closeIncident(id, Number(user.sub));
+  }
+
+  @Patch('incidents/:id/reopen')
+  reopenIncident(@Param('id', ParseIntPipe) id: number, @CurrentUser() user: any) {
+    return this.safetyService.reopenIncident(id, Number(user.sub));
+  }
+
+  @Delete('incidents/:id')
+  removeIncident(@Param('id', ParseIntPipe) id: number, @CurrentUser() user: any) {
+    return this.safetyService.removeIncident(id, Number(user.sub));
+  }
+
   @Post('risk-assessments')
-  createRiskAssessment(
-    @Body() dto: CreateRiskAssessmentDto,
-    @CurrentUser() user: any,
-  ) {
+  createRiskAssessment(@Body() dto: CreateRiskAssessmentDto, @CurrentUser() user: any) {
     return this.safetyService.createRiskAssessment(dto, Number(user.sub));
   }
 
   @Get('projects/:projectId/risk-assessments')
   findRiskAssessments(@Param('projectId', ParseIntPipe) projectId: number) {
     return this.safetyService.findRiskAssessments(projectId);
+  }
+
+  @Get('risk-assessments/:id')
+  findRiskAssessment(@Param('id', ParseIntPipe) id: number) {
+    return this.safetyService.findRiskAssessment(id);
   }
 
   @Patch('risk-assessments/:id')
@@ -66,17 +89,24 @@ export class SafetyController {
     return this.safetyService.updateRiskAssessment(id, dto, Number(user.sub));
   }
 
+  @Delete('risk-assessments/:id')
+  removeRiskAssessment(@Param('id', ParseIntPipe) id: number, @CurrentUser() user: any) {
+    return this.safetyService.removeRiskAssessment(id, Number(user.sub));
+  }
+
   @Post('toolbox-talks')
-  createToolboxTalk(
-    @Body() dto: CreateToolboxTalkDto,
-    @CurrentUser() user: any,
-  ) {
+  createToolboxTalk(@Body() dto: CreateToolboxTalkDto, @CurrentUser() user: any) {
     return this.safetyService.createToolboxTalk(dto, Number(user.sub));
   }
 
   @Get('projects/:projectId/toolbox-talks')
   findToolboxTalks(@Param('projectId', ParseIntPipe) projectId: number) {
     return this.safetyService.findToolboxTalks(projectId);
+  }
+
+  @Get('toolbox-talks/:id')
+  findToolboxTalk(@Param('id', ParseIntPipe) id: number) {
+    return this.safetyService.findToolboxTalk(id);
   }
 
   @Patch('toolbox-talks/:id')
@@ -88,17 +118,24 @@ export class SafetyController {
     return this.safetyService.updateToolboxTalk(id, dto, Number(user.sub));
   }
 
+  @Delete('toolbox-talks/:id')
+  removeToolboxTalk(@Param('id', ParseIntPipe) id: number, @CurrentUser() user: any) {
+    return this.safetyService.removeToolboxTalk(id, Number(user.sub));
+  }
+
   @Post('inspections')
-  createSafetyInspection(
-    @Body() dto: CreateSafetyInspectionDto,
-    @CurrentUser() user: any,
-  ) {
+  createSafetyInspection(@Body() dto: CreateSafetyInspectionDto, @CurrentUser() user: any) {
     return this.safetyService.createSafetyInspection(dto, Number(user.sub));
   }
 
   @Get('projects/:projectId/inspections')
   findSafetyInspections(@Param('projectId', ParseIntPipe) projectId: number) {
     return this.safetyService.findSafetyInspections(projectId);
+  }
+
+  @Get('inspections/:id')
+  findSafetyInspection(@Param('id', ParseIntPipe) id: number) {
+    return this.safetyService.findSafetyInspection(id);
   }
 
   @Patch('inspections/:id')
@@ -108,5 +145,10 @@ export class SafetyController {
     @CurrentUser() user: any,
   ) {
     return this.safetyService.updateSafetyInspection(id, dto, Number(user.sub));
+  }
+
+  @Delete('inspections/:id')
+  removeSafetyInspection(@Param('id', ParseIntPipe) id: number, @CurrentUser() user: any) {
+    return this.safetyService.removeSafetyInspection(id, Number(user.sub));
   }
 }

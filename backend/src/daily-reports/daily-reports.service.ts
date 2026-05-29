@@ -11,31 +11,35 @@ import { UpdateDailyReportDto } from './dto/update-daily-report.dto';
 
 @Injectable()
 export class DailyReportsService {
-  private readonly db: any;
-
   constructor(
     private readonly prisma: PrismaService,
     private readonly auditService: AuditService,
-  ) {
-    this.db = prisma as any;
-  }
+  ) {}
 
   async create(dto: CreateDailyReportDto, userId?: number) {
-    const project = await this.db.project.findUnique({
-      where: { id: dto.projectId },
+    const projectId = Number(dto.projectId);
+
+    if (!projectId) {
+      throw new BadRequestException('Project is required');
+    }
+
+    const project = await this.prisma.project.findUnique({
+      where: { id: projectId },
+      select: { id: true, code: true, name: true },
     });
 
     if (!project) {
       throw new NotFoundException('Project not found');
     }
 
-    const reportDate = new Date(dto.reportDate);
+    const reportDate = this.normalizeReportDate(dto.reportDate);
 
-    const existing = await this.db.dailyReport.findFirst({
+    const existing = await this.prisma.dailyReport.findFirst({
       where: {
-        projectId: dto.projectId,
+        projectId,
         reportDate,
       },
+      select: { id: true },
     });
 
     if (existing) {
@@ -44,19 +48,19 @@ export class DailyReportsService {
       );
     }
 
-    const report = await this.db.dailyReport.create({
+    const report = await this.prisma.dailyReport.create({
       data: {
-        projectId: dto.projectId,
+        projectId,
         reportDate,
-        weather: dto.weather ?? null,
-        manpowerCount: dto.manpowerCount ?? 0,
-        equipmentUsed: dto.equipmentUsed ?? null,
-        workCompleted: dto.workCompleted ?? null,
-        materialReceived: dto.materialReceived ?? null,
+        weather: this.nullIfEmpty(dto.weather),
+        manpowerCount: this.toNonNegativeInt(dto.manpowerCount, 'Manpower count'),
+        equipmentUsed: this.nullIfEmpty(dto.equipmentUsed),
+        workCompleted: this.nullIfEmpty(dto.workCompleted),
+        materialReceived: this.nullIfEmpty(dto.materialReceived),
         sitePhotos: dto.sitePhotos ?? [],
-        issues: dto.issues ?? null,
-        delays: dto.delays ?? null,
-        remarks: dto.remarks ?? null,
+        issues: this.nullIfEmpty(dto.issues),
+        delays: this.nullIfEmpty(dto.delays),
+        remarks: this.nullIfEmpty(dto.remarks),
         preparedById: userId ?? null,
       },
       include: this.reportInclude(),
@@ -69,25 +73,32 @@ export class DailyReportsService {
       module: 'daily_reports',
       entityName: 'DailyReport',
       entityId: String(report.id),
-      description: `Created daily report for ${report.reportDate.toISOString().slice(0, 10)}`,
+      description: `Created daily report for ${this.formatDate(report.reportDate)}`,
       newData: report,
     });
 
     return report;
   }
 
-  findByProject(projectId: number) {
-    return this.db.dailyReport.findMany({
+  async findByProject(projectId: number) {
+    const project = await this.prisma.project.findUnique({
+      where: { id: projectId },
+      select: { id: true },
+    });
+
+    if (!project) {
+      throw new NotFoundException('Project not found');
+    }
+
+    return this.prisma.dailyReport.findMany({
       where: { projectId },
       include: this.reportInclude(),
-      orderBy: {
-        reportDate: 'desc',
-      },
+      orderBy: [{ reportDate: 'desc' }, { createdAt: 'desc' }],
     });
   }
 
   async findOne(id: number) {
-    const report = await this.db.dailyReport.findUnique({
+    const report = await this.prisma.dailyReport.findUnique({
       where: { id },
       include: this.reportInclude(),
     });
@@ -102,9 +113,12 @@ export class DailyReportsService {
   async update(id: number, dto: UpdateDailyReportDto, userId?: number) {
     const oldReport = await this.findOne(id);
 
+    const nextProjectId = dto.projectId ? Number(dto.projectId) : oldReport.projectId;
+
     if (dto.projectId) {
-      const project = await this.db.project.findUnique({
-        where: { id: dto.projectId },
+      const project = await this.prisma.project.findUnique({
+        where: { id: nextProjectId },
+        select: { id: true },
       });
 
       if (!project) {
@@ -112,20 +126,53 @@ export class DailyReportsService {
       }
     }
 
-    const updated = await this.db.dailyReport.update({
+    const nextReportDate = dto.reportDate
+      ? this.normalizeReportDate(dto.reportDate)
+      : oldReport.reportDate;
+
+    if (dto.projectId || dto.reportDate) {
+      const duplicate = await this.prisma.dailyReport.findFirst({
+        where: {
+          projectId: nextProjectId,
+          reportDate: nextReportDate,
+          NOT: { id },
+        },
+        select: { id: true },
+      });
+
+      if (duplicate) {
+        throw new BadRequestException(
+          'Another daily report already exists for this project and date',
+        );
+      }
+    }
+
+    const updated = await this.prisma.dailyReport.update({
       where: { id },
       data: {
-        projectId: dto.projectId,
-        reportDate: dto.reportDate ? new Date(dto.reportDate) : undefined,
-        weather: dto.weather,
-        manpowerCount: dto.manpowerCount,
-        equipmentUsed: dto.equipmentUsed,
-        workCompleted: dto.workCompleted,
-        materialReceived: dto.materialReceived,
-        sitePhotos: dto.sitePhotos,
-        issues: dto.issues,
-        delays: dto.delays,
-        remarks: dto.remarks,
+        projectId: dto.projectId ? Number(dto.projectId) : undefined,
+        reportDate: dto.reportDate ? nextReportDate : undefined,
+        weather: dto.weather !== undefined ? this.nullIfEmpty(dto.weather) : undefined,
+        manpowerCount:
+          dto.manpowerCount !== undefined
+            ? this.toNonNegativeInt(dto.manpowerCount, 'Manpower count')
+            : undefined,
+        equipmentUsed:
+          dto.equipmentUsed !== undefined
+            ? this.nullIfEmpty(dto.equipmentUsed)
+            : undefined,
+        workCompleted:
+          dto.workCompleted !== undefined
+            ? this.nullIfEmpty(dto.workCompleted)
+            : undefined,
+        materialReceived:
+          dto.materialReceived !== undefined
+            ? this.nullIfEmpty(dto.materialReceived)
+            : undefined,
+        sitePhotos: dto.sitePhotos !== undefined ? dto.sitePhotos : undefined,
+        issues: dto.issues !== undefined ? this.nullIfEmpty(dto.issues) : undefined,
+        delays: dto.delays !== undefined ? this.nullIfEmpty(dto.delays) : undefined,
+        remarks: dto.remarks !== undefined ? this.nullIfEmpty(dto.remarks) : undefined,
       },
       include: this.reportInclude(),
     });
@@ -137,7 +184,7 @@ export class DailyReportsService {
       module: 'daily_reports',
       entityName: 'DailyReport',
       entityId: String(id),
-      description: `Updated daily report for ${updated.reportDate.toISOString().slice(0, 10)}`,
+      description: `Updated daily report for ${this.formatDate(updated.reportDate)}`,
       oldData: oldReport,
       newData: updated,
     });
@@ -148,7 +195,7 @@ export class DailyReportsService {
   async remove(id: number, userId?: number) {
     const oldReport = await this.findOne(id);
 
-    const deleted = await this.db.dailyReport.delete({
+    const deleted = await this.prisma.dailyReport.delete({
       where: { id },
     });
 
@@ -159,7 +206,7 @@ export class DailyReportsService {
       module: 'daily_reports',
       entityName: 'DailyReport',
       entityId: String(id),
-      description: `Deleted daily report for ${oldReport.reportDate.toISOString().slice(0, 10)}`,
+      description: `Deleted daily report for ${this.formatDate(oldReport.reportDate)}`,
       oldData: oldReport,
       newData: deleted,
     });
@@ -185,5 +232,41 @@ export class DailyReportsService {
         },
       },
     };
+  }
+
+  private normalizeReportDate(value: string | Date) {
+    if (!value) {
+      throw new BadRequestException('Report date is required');
+    }
+
+    const date = new Date(value);
+
+    if (Number.isNaN(date.getTime())) {
+      throw new BadRequestException('Invalid report date');
+    }
+
+    date.setHours(0, 0, 0, 0);
+    return date;
+  }
+
+  private toNonNegativeInt(value: unknown, fieldName: string) {
+    const numberValue = Number(value ?? 0);
+
+    if (!Number.isInteger(numberValue) || numberValue < 0) {
+      throw new BadRequestException(`${fieldName} must be a non-negative whole number`);
+    }
+
+    return numberValue;
+  }
+
+  private nullIfEmpty(value?: string | null) {
+    if (value === undefined || value === null) return null;
+
+    const trimmed = String(value).trim();
+    return trimmed.length > 0 ? trimmed : null;
+  }
+
+  private formatDate(value: Date) {
+    return value.toISOString().slice(0, 10);
   }
 }

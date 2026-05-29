@@ -1,6 +1,7 @@
 import {
   Body,
   Controller,
+  Delete,
   Get,
   Param,
   ParseIntPipe,
@@ -21,17 +22,12 @@ export class RfisController {
   constructor(private readonly rfisService: RfisService) {}
 
   @Post()
-  create(
-    @Body() dto: CreateRfiDto,
-    @CurrentUser() user: any,
-  ) {
+  create(@Body() dto: CreateRfiDto, @CurrentUser() user: any) {
     return this.rfisService.create(dto, Number(user.sub));
   }
 
   @Get('project/:projectId')
-  findByProject(
-    @Param('projectId', ParseIntPipe) projectId: number,
-  ) {
+  findByProject(@Param('projectId', ParseIntPipe) projectId: number) {
     return this.rfisService.findByProject(projectId);
   }
 
@@ -59,10 +55,26 @@ export class RfisController {
   }
 
   @Patch(':id/close')
-  close(
+  close(@Param('id', ParseIntPipe) id: number, @CurrentUser() user: any) {
+    return this.rfisService.close(id, Number(user.sub));
+  }
+
+  @Patch(':id/reopen')
+  reopen(@Param('id', ParseIntPipe) id: number, @CurrentUser() user: any) {
+    return this.rfisService.reopen(id, Number(user.sub));
+  }
+
+  @Patch(':id/reject')
+  reject(
     @Param('id', ParseIntPipe) id: number,
+    @Body('response') response: string,
     @CurrentUser() user: any,
   ) {
-    return this.rfisService.close(id, Number(user.sub));
+    return this.rfisService.reject(id, response, Number(user.sub));
+  }
+
+  @Delete(':id')
+  remove(@Param('id', ParseIntPipe) id: number, @CurrentUser() user: any) {
+    return this.rfisService.remove(id, Number(user.sub));
   }
 }

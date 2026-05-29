@@ -1,6 +1,7 @@
 import {
   Body,
   Controller,
+  Delete,
   Get,
   Param,
   ParseIntPipe,
@@ -41,16 +42,21 @@ export class ApprovalsController {
     @Query('entityName') entityName: string,
     @Query('entityId') entityId: string,
   ) {
-    return this.approvalsService.findByEntity(
-      module,
-      entityName,
-      Number(entityId),
-    );
+    return this.approvalsService.findByEntity(module, entityName, Number(entityId));
   }
 
   @Get(':id')
   findOne(@Param('id', ParseIntPipe) id: number) {
     return this.approvalsService.findOne(id);
+  }
+
+  @Patch(':id')
+  update(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() dto: Partial<CreateApprovalDto>,
+    @CurrentUser() user: any,
+  ) {
+    return this.approvalsService.update(id, dto, Number(user.sub));
   }
 
   @Patch(':id/review')
@@ -65,5 +71,15 @@ export class ApprovalsController {
   @Patch(':id/cancel')
   cancel(@Param('id', ParseIntPipe) id: number, @CurrentUser() user: any) {
     return this.approvalsService.cancel(id, Number(user.sub));
+  }
+
+  @Patch(':id/reopen')
+  reopen(@Param('id', ParseIntPipe) id: number, @CurrentUser() user: any) {
+    return this.approvalsService.reopen(id, Number(user.sub));
+  }
+
+  @Delete(':id')
+  remove(@Param('id', ParseIntPipe) id: number, @CurrentUser() user: any) {
+    return this.approvalsService.remove(id, Number(user.sub));
   }
 }

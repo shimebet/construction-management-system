@@ -1,6 +1,7 @@
 import {
   Body,
   Controller,
+  Delete,
   Get,
   Param,
   ParseIntPipe,
@@ -45,6 +46,21 @@ export class FinanceController {
     return this.financeService.updateInvoice(id, dto, Number(user.sub));
   }
 
+  @Patch('invoices/:id/send')
+  sendInvoice(@Param('id', ParseIntPipe) id: number, @CurrentUser() user: any) {
+    return this.financeService.sendInvoice(id, Number(user.sub));
+  }
+
+  @Patch('invoices/:id/cancel')
+  cancelInvoice(@Param('id', ParseIntPipe) id: number, @CurrentUser() user: any) {
+    return this.financeService.cancelInvoice(id, Number(user.sub));
+  }
+
+  @Delete('invoices/:id')
+  removeInvoice(@Param('id', ParseIntPipe) id: number, @CurrentUser() user: any) {
+    return this.financeService.removeInvoice(id, Number(user.sub));
+  }
+
   @Post('payments')
   createPayment(@Body() dto: CreatePaymentDto, @CurrentUser() user: any) {
     return this.financeService.createPayment(dto, Number(user.sub));
@@ -55,6 +71,11 @@ export class FinanceController {
     return this.financeService.findPayments(projectId);
   }
 
+  @Get('payments/:id')
+  findPayment(@Param('id', ParseIntPipe) id: number) {
+    return this.financeService.findPayment(id);
+  }
+
   @Patch('payments/:id')
   updatePayment(
     @Param('id', ParseIntPipe) id: number,
@@ -62,6 +83,21 @@ export class FinanceController {
     @CurrentUser() user: any,
   ) {
     return this.financeService.updatePayment(id, dto, Number(user.sub));
+  }
+
+  @Patch('payments/:id/complete')
+  completePayment(@Param('id', ParseIntPipe) id: number, @CurrentUser() user: any) {
+    return this.financeService.completePayment(id, Number(user.sub));
+  }
+
+  @Patch('payments/:id/cancel')
+  cancelPayment(@Param('id', ParseIntPipe) id: number, @CurrentUser() user: any) {
+    return this.financeService.cancelPayment(id, Number(user.sub));
+  }
+
+  @Delete('payments/:id')
+  removePayment(@Param('id', ParseIntPipe) id: number, @CurrentUser() user: any) {
+    return this.financeService.removePayment(id, Number(user.sub));
   }
 
   @Get('projects/:projectId/cash-flow')

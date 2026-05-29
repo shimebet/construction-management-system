@@ -1,6 +1,8 @@
 import { Module } from '@nestjs/common';
+
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
+
 import { PrismaModule } from './prisma/prisma.module';
 import { AuthModule } from './auth/auth.module';
 import { UsersModule } from './users/users.module';
@@ -24,9 +26,35 @@ import { InventoryModule } from './inventory/inventory.module';
 import { CostModule } from './cost/cost.module';
 import { FinanceModule } from './finance/finance.module';
 import { ProfileModule } from './profile/profile.module';
+import { NotificationsModule } from './notifications/notifications.module';
 
 @Module({
-  imports: [PrismaModule, AuthModule, UsersModule, CompaniesModule, ProjectsModule, RolesModule, AuditModule, WbsModule, TasksModule, MilestonesModule, SchedulesModule, DailyReportsModule, DocumentsModule, RfisModule, SubmittalsModule, ApprovalsModule, QualityModule, SafetyModule, ProcurementModule, InventoryModule, CostModule, FinanceModule, ProfileModule],
+  imports: [
+    PrismaModule,
+    AuthModule,
+    UsersModule,
+    CompaniesModule,
+    ProjectsModule,
+    RolesModule,
+    AuditModule,
+    WbsModule,
+    TasksModule,
+    MilestonesModule,
+    SchedulesModule,
+    DailyReportsModule,
+    DocumentsModule,
+    RfisModule,
+    SubmittalsModule,
+    ApprovalsModule,
+    NotificationsModule,
+    QualityModule,
+    SafetyModule,
+    ProcurementModule,
+    InventoryModule,
+    CostModule,
+    FinanceModule,
+    ProfileModule,
+  ],
   controllers: [AppController],
   providers: [AppService],
 })

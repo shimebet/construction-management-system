@@ -1,6 +1,7 @@
 import {
   Body,
   Controller,
+  Delete,
   Get,
   Param,
   ParseIntPipe,
@@ -33,6 +34,11 @@ export class QualityController {
     return this.qualityService.findChecklists(projectId);
   }
 
+  @Get('checklists/:id')
+  findChecklist(@Param('id', ParseIntPipe) id: number) {
+    return this.qualityService.findChecklist(id);
+  }
+
   @Patch('checklists/:id')
   updateChecklist(
     @Param('id', ParseIntPipe) id: number,
@@ -40,6 +46,11 @@ export class QualityController {
     @CurrentUser() user: any,
   ) {
     return this.qualityService.updateChecklist(id, dto, Number(user.sub));
+  }
+
+  @Delete('checklists/:id')
+  removeChecklist(@Param('id', ParseIntPipe) id: number, @CurrentUser() user: any) {
+    return this.qualityService.removeChecklist(id, Number(user.sub));
   }
 
   @Post('inspections')
@@ -52,6 +63,11 @@ export class QualityController {
     return this.qualityService.findInspections(projectId);
   }
 
+  @Get('inspections/:id')
+  findInspection(@Param('id', ParseIntPipe) id: number) {
+    return this.qualityService.findInspection(id);
+  }
+
   @Patch('inspections/:id')
   updateInspection(
     @Param('id', ParseIntPipe) id: number,
@@ -59,6 +75,11 @@ export class QualityController {
     @CurrentUser() user: any,
   ) {
     return this.qualityService.updateInspection(id, dto, Number(user.sub));
+  }
+
+  @Delete('inspections/:id')
+  removeInspection(@Param('id', ParseIntPipe) id: number, @CurrentUser() user: any) {
+    return this.qualityService.removeInspection(id, Number(user.sub));
   }
 
   @Post('ncrs')
@@ -71,6 +92,11 @@ export class QualityController {
     return this.qualityService.findNcrs(projectId);
   }
 
+  @Get('ncrs/:id')
+  findNcr(@Param('id', ParseIntPipe) id: number) {
+    return this.qualityService.findNcr(id);
+  }
+
   @Patch('ncrs/:id')
   updateNcr(
     @Param('id', ParseIntPipe) id: number,
@@ -78,5 +104,20 @@ export class QualityController {
     @CurrentUser() user: any,
   ) {
     return this.qualityService.updateNcr(id, dto, Number(user.sub));
+  }
+
+  @Patch('ncrs/:id/close')
+  closeNcr(@Param('id', ParseIntPipe) id: number, @CurrentUser() user: any) {
+    return this.qualityService.closeNcr(id, Number(user.sub));
+  }
+
+  @Patch('ncrs/:id/reopen')
+  reopenNcr(@Param('id', ParseIntPipe) id: number, @CurrentUser() user: any) {
+    return this.qualityService.reopenNcr(id, Number(user.sub));
+  }
+
+  @Delete('ncrs/:id')
+  removeNcr(@Param('id', ParseIntPipe) id: number, @CurrentUser() user: any) {
+    return this.qualityService.removeNcr(id, Number(user.sub));
   }
 }

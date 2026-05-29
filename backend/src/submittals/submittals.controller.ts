@@ -1,6 +1,7 @@
 import {
   Body,
   Controller,
+  Delete,
   Get,
   Param,
   ParseIntPipe,
@@ -61,5 +62,15 @@ export class SubmittalsController {
   @Patch(':id/close')
   close(@Param('id', ParseIntPipe) id: number, @CurrentUser() user: any) {
     return this.submittalsService.close(id, Number(user.sub));
+  }
+
+  @Patch(':id/reopen')
+  reopen(@Param('id', ParseIntPipe) id: number, @CurrentUser() user: any) {
+    return this.submittalsService.reopen(id, Number(user.sub));
+  }
+
+  @Delete(':id')
+  remove(@Param('id', ParseIntPipe) id: number, @CurrentUser() user: any) {
+    return this.submittalsService.remove(id, Number(user.sub));
   }
 }
