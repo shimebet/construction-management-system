@@ -1,12 +1,5 @@
 import { api } from './client';
 
-export type DocumentStatus =
-  | 'WIP'
-  | 'SHARED'
-  | 'PUBLISHED'
-  | 'ARCHIVED'
-  | 'REJECTED';
-
 export type DocumentType =
   | 'DRAWING'
   | 'RFI'
@@ -16,6 +9,8 @@ export type DocumentType =
   | 'CONTRACT'
   | 'REPORT'
   | 'OTHER';
+
+export type DocumentStatus = 'WIP' | 'SHARED' | 'PUBLISHED' | 'ARCHIVED' | 'REJECTED';
 
 export type DocumentVersion = {
   id: number;
@@ -27,11 +22,12 @@ export type DocumentVersion = {
   fileSize?: number | null;
   mimeType?: string | null;
   notes?: string | null;
-  createdAt: string;
+  createdAt?: string;
   uploadedBy?: {
     id: number;
     name: string;
     email: string;
+    jobTitle?: string | null;
   } | null;
 };
 
@@ -48,6 +44,13 @@ export type ProjectDocument = {
   status: DocumentStatus;
   currentRevision?: string | null;
   description?: string | null;
+  createdAt?: string;
+  updatedAt?: string;
+  project?: {
+    id: number;
+    code: string;
+    name: string;
+  };
   versions?: DocumentVersion[];
 };
 
@@ -71,6 +74,11 @@ export const documentsApi = {
     return response.data;
   },
 
+  findOne: async (id: number): Promise<ProjectDocument> => {
+    const response = await api.get(`/documents/${id}`);
+    return response.data;
+  },
+
   create: async (data: CreateDocumentPayload): Promise<ProjectDocument> => {
     const response = await api.post('/documents', data);
     return response.data;
@@ -84,11 +92,21 @@ export const documentsApi = {
     return response.data;
   },
 
+  archive: async (id: number): Promise<ProjectDocument> => {
+    const response = await api.patch(`/documents/${id}/archive`);
+    return response.data;
+  },
+
   changeStatus: async (
     id: number,
     status: DocumentStatus,
   ): Promise<ProjectDocument> => {
     const response = await api.patch(`/documents/${id}/status/${status}`);
+    return response.data;
+  },
+
+  findVersions: async (documentId: number): Promise<DocumentVersion[]> => {
+    const response = await api.get(`/documents/${documentId}/versions`);
     return response.data;
   },
 
@@ -105,10 +123,7 @@ export const documentsApi = {
     formData.append('file', data.file);
     formData.append('revision', data.revision);
     formData.append('status', data.status);
-
-    if (data.notes) {
-      formData.append('notes', data.notes);
-    }
+    formData.append('notes', data.notes ?? '');
 
     const response = await api.post(
       `/documents/${documentId}/upload-version`,
@@ -123,7 +138,6 @@ export const documentsApi = {
     return response.data;
   },
 
-  getDownloadUrl: (versionId: number) => {
-    return `${import.meta.env.VITE_API_URL}/documents/versions/${versionId}/download`;
-  },
+  getDownloadUrl: (versionId: number) =>
+    `${api.defaults.baseURL}/documents/versions/${versionId}/download`,
 };
