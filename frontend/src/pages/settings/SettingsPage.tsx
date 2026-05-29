@@ -1,27 +1,73 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
+import { Edit, Save, Search, ShieldCheck, Trash2, X } from 'lucide-react';
 import { settingsApi } from '../../api/settings.api';
 import type { Permission, Role } from '../../api/settings.api';
 import { Button, Card, DataTable, Input, PageHeader } from '../../components/ui';
+
+const emptyRoleForm = {
+  name: '',
+  description: '',
+  isSystem: false,
+};
 
 export default function SettingsPage() {
   const [roles, setRoles] = useState<Role[]>([]);
   const [permissions, setPermissions] = useState<Permission[]>([]);
   const [selectedRoleId, setSelectedRoleId] = useState<number | ''>('');
-  const [selectedPermissionId, setSelectedPermissionId] = useState<number | ''>(
-    '',
+  const [selectedPermissionIds, setSelectedPermissionIds] = useState<number[]>(
+    [],
   );
+  const [permissionSearch, setPermissionSearch] = useState('');
+  const [editingRole, setEditingRole] = useState<Role | null>(null);
+  const [roleForm, setRoleForm] = useState(emptyRoleForm);
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState('');
 
-  const [roleForm, setRoleForm] = useState({
-    name: '',
-    description: '',
-    isSystem: false,
-  });
+  const selectedRole = roles.find((role) => role.id === Number(selectedRoleId));
+
+  const filteredPermissions = useMemo(() => {
+    const query = permissionSearch.trim().toLowerCase();
+
+    return permissions.filter((permission) => {
+      if (!query) return true;
+
+      return (
+        permission.module.toLowerCase().includes(query) ||
+        permission.action.toLowerCase().includes(query) ||
+        String(permission.description || '').toLowerCase().includes(query)
+      );
+    });
+  }, [permissions, permissionSearch]);
+
+  const groupedPermissions = useMemo(() => {
+    return Object.entries(
+      filteredPermissions.reduce<Record<string, Permission[]>>(
+        (group, permission) => {
+          group[permission.module] = group[permission.module] || [];
+          group[permission.module].push(permission);
+          return group;
+        },
+        {},
+      ),
+    );
+  }, [filteredPermissions]);
+
+  useEffect(() => {
+    loadSettings();
+  }, []);
+
+  useEffect(() => {
+    const role = roles.find((item) => item.id === Number(selectedRoleId));
+
+    setSelectedPermissionIds(
+      role?.rolePermissions?.map((item) => item.permissionId) ?? [],
+    );
+  }, [selectedRoleId, roles]);
 
   async function loadSettings() {
     try {
       setLoading(true);
+      setMessage('');
 
       const [roleData, permissionData] = await Promise.all([
         settingsApi.findRoles(),
@@ -41,43 +87,95 @@ export default function SettingsPage() {
     }
   }
 
-  useEffect(() => {
-    loadSettings();
-  }, []);
-
-  async function createRole(e: React.FormEvent) {
+  async function saveRole(e: React.FormEvent) {
     e.preventDefault();
 
     try {
       setLoading(true);
       setMessage('');
 
-      await settingsApi.createRole({
-        name: roleForm.name,
-        description: roleForm.description,
-        isSystem: roleForm.isSystem,
-      });
+      if (editingRole) {
+        await settingsApi.updateRole(editingRole.id, roleForm);
+        setMessage('Role updated successfully');
+      } else {
+        await settingsApi.createRole(roleForm);
+        setMessage('Role created successfully');
+      }
 
-      setRoleForm({
-        name: '',
-        description: '',
-        isSystem: false,
-      });
-
-      setMessage('Role created successfully');
+      resetRoleForm();
       await loadSettings();
     } catch (error: any) {
-      setMessage(error.response?.data?.message || 'Failed to create role');
+      setMessage(error.response?.data?.message || 'Failed to save role');
     } finally {
       setLoading(false);
     }
   }
 
-  async function assignPermission(e: React.FormEvent) {
-    e.preventDefault();
+  function editRole(role: Role) {
+    setEditingRole(role);
+    setRoleForm({
+      name: role.name,
+      description: role.description || '',
+      isSystem: role.isSystem,
+    });
+  }
 
-    if (!selectedRoleId || !selectedPermissionId) {
-      setMessage('Select role and permission first');
+  async function deleteRole(role: Role) {
+    if (role.isSystem) {
+      setMessage('System roles cannot be deleted');
+      return;
+    }
+
+    if (!window.confirm(`Delete role "${role.name}"?`)) return;
+
+    try {
+      setLoading(true);
+      setMessage('');
+
+      await settingsApi.removeRole(role.id);
+
+      setMessage('Role deleted successfully');
+      await loadSettings();
+    } catch (error: any) {
+      setMessage(error.response?.data?.message || 'Failed to delete role');
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  function resetRoleForm() {
+    setEditingRole(null);
+    setRoleForm(emptyRoleForm);
+  }
+
+  function togglePermission(permissionId: number) {
+    setSelectedPermissionIds((prev) =>
+      prev.includes(permissionId)
+        ? prev.filter((id) => id !== permissionId)
+        : [...prev, permissionId],
+    );
+  }
+
+  function toggleModulePermissions(modulePermissions: Permission[]) {
+    const modulePermissionIds = modulePermissions.map((item) => item.id);
+    const allSelected = modulePermissionIds.every((id) =>
+      selectedPermissionIds.includes(id),
+    );
+
+    if (allSelected) {
+      setSelectedPermissionIds((prev) =>
+        prev.filter((id) => !modulePermissionIds.includes(id)),
+      );
+    } else {
+      setSelectedPermissionIds((prev) => [
+        ...new Set([...prev, ...modulePermissionIds]),
+      ]);
+    }
+  }
+
+  async function savePermissionMatrix() {
+    if (!selectedRoleId) {
+      setMessage('Select role first');
       return;
     }
 
@@ -85,42 +183,19 @@ export default function SettingsPage() {
       setLoading(true);
       setMessage('');
 
-      await settingsApi.assignPermission(
+      await settingsApi.syncPermissions(
         Number(selectedRoleId),
-        Number(selectedPermissionId),
+        selectedPermissionIds,
       );
 
-      setSelectedPermissionId('');
-      setMessage('Permission assigned successfully');
+      setMessage('Permissions updated successfully');
       await loadSettings();
     } catch (error: any) {
-      setMessage(error.response?.data?.message || 'Failed to assign permission');
+      setMessage(error.response?.data?.message || 'Failed to update permissions');
     } finally {
       setLoading(false);
     }
   }
-
-  async function removePermission(roleId: number, permissionId: number) {
-    const confirmed = window.confirm('Remove this permission from role?');
-
-    if (!confirmed) return;
-
-    try {
-      setLoading(true);
-      setMessage('');
-
-      await settingsApi.removePermission(roleId, permissionId);
-
-      setMessage('Permission removed successfully');
-      await loadSettings();
-    } catch (error: any) {
-      setMessage(error.response?.data?.message || 'Failed to remove permission');
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  const selectedRole = roles.find((role) => role.id === Number(selectedRoleId));
 
   return (
     <div>
@@ -134,21 +209,25 @@ export default function SettingsPage() {
           style={{
             marginBottom: 16,
             padding: 12,
-            background: '#f9fafb',
+            background: message.toLowerCase().includes('success')
+              ? '#dcfce7'
+              : '#fee2e2',
+            color: message.toLowerCase().includes('success')
+              ? '#166534'
+              : '#991b1b',
             border: '1px solid #e5e7eb',
             borderRadius: 8,
+            fontWeight: 600,
           }}
         >
           {message}
         </div>
       )}
 
-      {loading && <p>Loading settings...</p>}
-
       <div className="module-grid">
         <div className="module-sidebar">
-          <Card title="Create Role">
-            <form onSubmit={createRole}>
+          <Card title={editingRole ? 'Edit Role' : 'Create Role'}>
+            <form onSubmit={saveRole}>
               <Input
                 label="Role Name"
                 value={roleForm.name}
@@ -187,48 +266,116 @@ export default function SettingsPage() {
                 System Role
               </label>
 
-              <Button disabled={loading} style={{ width: '100%' }}>
-                Create Role
-              </Button>
+              <div style={{ display: 'flex', gap: 8 }}>
+                <Button disabled={loading} style={{ flex: 1 }}>
+                  {editingRole ? (
+                    <>
+                      <Save size={15} /> Save Changes
+                    </>
+                  ) : (
+                    'Create Role'
+                  )}
+                </Button>
+
+                {editingRole && (
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    onClick={resetRoleForm}
+                  >
+                    <X size={15} /> Cancel
+                  </Button>
+                )}
+              </div>
             </form>
           </Card>
 
-          <Card title="Assign Permission">
-            <form onSubmit={assignPermission}>
-              <SelectField
-                label="Role"
-                value={selectedRoleId}
-                onChange={(value) =>
-                  setSelectedRoleId(value ? Number(value) : '')
-                }
-              >
-                <option value="">Select role</option>
-                {roles.map((role) => (
-                  <option key={role.id} value={role.id}>
-                    {role.name}
-                  </option>
-                ))}
-              </SelectField>
+          <Card title="Permission Matrix">
+            <SelectField
+              label="Role"
+              value={selectedRoleId}
+              onChange={(value) => setSelectedRoleId(value ? Number(value) : '')}
+            >
+              <option value="">Select role</option>
+              {roles.map((role) => (
+                <option key={role.id} value={role.id}>
+                  {role.name}
+                </option>
+              ))}
+            </SelectField>
 
-              <SelectField
-                label="Permission"
-                value={selectedPermissionId}
-                onChange={(value) =>
-                  setSelectedPermissionId(value ? Number(value) : '')
-                }
-              >
-                <option value="">Select permission</option>
-                {permissions.map((permission) => (
-                  <option key={permission.id} value={permission.id}>
-                    {permission.module}:{permission.action}
-                  </option>
-                ))}
-              </SelectField>
+            <Input
+              label="Search Permissions"
+              value={permissionSearch}
+              onChange={(e) => setPermissionSearch(e.target.value)}
+              placeholder="Search module, action, description..."
+            />
 
-              <Button disabled={loading} style={{ width: '100%' }}>
-                Assign Permission
-              </Button>
-            </form>
+            <div style={{ maxHeight: 420, overflowY: 'auto', marginTop: 12 }}>
+              {groupedPermissions.map(([module, modulePermissions]) => {
+                const modulePermissionIds = modulePermissions.map(
+                  (item) => item.id,
+                );
+                const allSelected = modulePermissionIds.every((id) =>
+                  selectedPermissionIds.includes(id),
+                );
+
+                return (
+                  <div key={module} style={{ marginBottom: 18 }}>
+                    <label
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: 8,
+                        fontWeight: 800,
+                        textTransform: 'capitalize',
+                        borderBottom: '1px solid #e5e7eb',
+                        paddingBottom: 8,
+                      }}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={allSelected}
+                        onChange={() => toggleModulePermissions(modulePermissions)}
+                      />
+                      {module}
+                    </label>
+
+                    {modulePermissions.map((permission) => (
+                      <label
+                        key={permission.id}
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: 8,
+                          padding: '8px 0',
+                          borderBottom: '1px solid #f1f5f9',
+                        }}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={selectedPermissionIds.includes(permission.id)}
+                          onChange={() => togglePermission(permission.id)}
+                        />
+
+                        <span>
+                          {permission.module}:{permission.action}
+                        </span>
+                      </label>
+                    ))}
+                  </div>
+                );
+              })}
+            </div>
+
+            <Button
+              type="button"
+              disabled={loading || !selectedRoleId}
+              onClick={savePermissionMatrix}
+              style={{ width: '100%', marginTop: 12 }}
+            >
+              <ShieldCheck size={15} /> Save Permissions
+            </Button>
           </Card>
 
           <Card title="System Info">
@@ -245,14 +392,8 @@ export default function SettingsPage() {
           <Card title="Roles">
             <DataTable<Role>
               columns={[
-                {
-                  header: 'ID',
-                  accessor: (row) => `#${row.id}`,
-                },
-                {
-                  header: 'Name',
-                  accessor: 'name',
-                },
+                { header: 'ID', accessor: (row) => `#${row.id}` },
+                { header: 'Name', accessor: 'name' },
                 {
                   header: 'Description',
                   accessor: (row) => row.description || '-',
@@ -265,34 +406,34 @@ export default function SettingsPage() {
                   header: 'Permissions',
                   accessor: (row) => row.rolePermissions?.length ?? 0,
                 },
+                {
+                  header: 'Actions',
+                  accessor: (row) => (
+                    <div style={{ display: 'flex', gap: 8 }}>
+                      <Button
+                        type="button"
+                        variant="secondary"
+                        onClick={() => editRole(row)}
+                        style={{ padding: '6px 10px' }}
+                      >
+                        <Edit size={14} />
+                      </Button>
+
+                      <Button
+                        type="button"
+                        variant="danger"
+                        onClick={() => deleteRole(row)}
+                        disabled={row.isSystem}
+                        style={{ padding: '6px 10px' }}
+                      >
+                        <Trash2 size={14} />
+                      </Button>
+                    </div>
+                  ),
+                },
               ]}
               data={roles}
               emptyMessage="No roles found"
-            />
-          </Card>
-
-          <Card title="Permissions">
-            <DataTable<Permission>
-              columns={[
-                {
-                  header: 'ID',
-                  accessor: (row) => `#${row.id}`,
-                },
-                {
-                  header: 'Module',
-                  accessor: 'module',
-                },
-                {
-                  header: 'Action',
-                  accessor: 'action',
-                },
-                {
-                  header: 'Description',
-                  accessor: (row) => row.description || '-',
-                },
-              ]}
-              data={permissions}
-              emptyMessage="No permissions found"
             />
           </Card>
 
@@ -303,43 +444,43 @@ export default function SettingsPage() {
                 : 'Selected Role Permissions'
             }
           >
-            <DataTable<any>
+            <Input
+              label="Search Assigned Permissions"
+              value={permissionSearch}
+              onChange={(e) => setPermissionSearch(e.target.value)}
+              placeholder="Search assigned permissions..."
+            />
+
+            <DataTable<Permission>
               columns={[
-                {
-                  header: 'Module',
-                  accessor: (row) => row.permission?.module || '-',
-                },
-                {
-                  header: 'Action',
-                  accessor: (row) => row.permission?.action || '-',
-                },
+                { header: 'ID', accessor: (row) => `#${row.id}` },
+                { header: 'Module', accessor: 'module' },
+                { header: 'Action', accessor: 'action' },
                 {
                   header: 'Description',
-                  accessor: (row) => row.permission?.description || '-',
-                },
-                {
-                  header: 'Actions',
-                  accessor: (row) =>
-                    selectedRole ? (
-                      <Button
-                        variant="danger"
-                        onClick={() =>
-                          removePermission(
-                            selectedRole.id,
-                            row.permissionId,
-                          )
-                        }
-                        style={{ padding: '6px 10px' }}
-                      >
-                        Remove
-                      </Button>
-                    ) : (
-                      '-'
-                    ),
+                  accessor: (row) => row.description || '-',
                 },
               ]}
-              data={selectedRole?.rolePermissions ?? []}
+              data={permissions.filter((permission) =>
+                selectedPermissionIds.includes(permission.id),
+              )}
               emptyMessage="No permissions assigned to this role"
+            />
+          </Card>
+
+          <Card title="All Permissions">
+            <DataTable<Permission>
+              columns={[
+                { header: 'ID', accessor: (row) => `#${row.id}` },
+                { header: 'Module', accessor: 'module' },
+                { header: 'Action', accessor: 'action' },
+                {
+                  header: 'Description',
+                  accessor: (row) => row.description || '-',
+                },
+              ]}
+              data={permissions}
+              emptyMessage="No permissions found"
             />
           </Card>
         </div>

@@ -24,7 +24,7 @@ export default function AuditLogsPage() {
 
       setProjects(projectData);
       setLogs(logData);
-    } catch (error: any) {
+    } catch (error: any) { 
       setMessage(error.response?.data?.message || 'Failed to load audit logs');
     } finally {
       setLoading(false);
@@ -73,6 +73,22 @@ export default function AuditLogsPage() {
   useEffect(() => {
     loadInitialData();
   }, []);
+
+
+  async function deleteLog(id: number) {
+  if (!window.confirm('Delete this audit log?')) return;
+
+  try {
+    await auditApi.remove(id);
+    setLogs((prev) => prev.filter((log) => log.id !== id));
+
+    if (selectedLog?.id === id) {
+      setSelectedLog(null);
+    }
+  } catch (error: any) {
+    setMessage(error.response?.data?.message || 'Failed to delete audit log');
+  }
+}
 
   return (
     <div>
@@ -198,18 +214,28 @@ export default function AuditLogsPage() {
                   header: 'Description',
                   accessor: (row) => truncate(row.description),
                 },
-                {
-                  header: 'View',
-                  accessor: (row) => (
-                    <Button
-                      variant="secondary"
-                      onClick={() => setSelectedLog(row)}
-                      style={{ padding: '6px 10px' }}
-                    >
-                      View
-                    </Button>
-                  ),
-                },
+{
+  header: 'Actions',
+  accessor: (row) => (
+    <div style={{ display: 'flex', gap: 8 }}>
+      <Button
+        type="button"
+        variant="secondary"
+        onClick={() => setSelectedLog(row)}
+      >
+        View
+      </Button>
+
+      <Button
+        type="button"
+        variant="danger"
+        onClick={() => deleteLog(row.id)}
+      >
+        Delete
+      </Button>
+    </div>
+  ),
+}
               ]}
               data={logs}
               emptyMessage="No audit logs found"

@@ -28,9 +28,31 @@ export type CreateRolePayload = {
   isSystem?: boolean;
 };
 
+export type UpdateRolePayload = Partial<CreateRolePayload>;
+
 export const settingsApi = {
   findRoles: async (): Promise<Role[]> => {
     const response = await api.get('/roles');
+    return response.data;
+  },
+
+  findRole: async (id: number): Promise<Role> => {
+    const response = await api.get(`/roles/${id}`);
+    return response.data;
+  },
+
+  createRole: async (data: CreateRolePayload): Promise<Role> => {
+    const response = await api.post('/roles', data);
+    return response.data;
+  },
+
+  updateRole: async (id: number, data: UpdateRolePayload): Promise<Role> => {
+    const response = await api.patch(`/roles/${id}`, data);
+    return response.data;
+  },
+
+  removeRole: async (id: number): Promise<Role> => {
+    const response = await api.delete(`/roles/${id}`);
     return response.data;
   },
 
@@ -39,8 +61,13 @@ export const settingsApi = {
     return response.data;
   },
 
-  createRole: async (data: CreateRolePayload): Promise<Role> => {
-    const response = await api.post('/roles', data);
+  syncPermissions: async (
+    roleId: number,
+    permissionIds: number[],
+  ): Promise<Role> => {
+    const response = await api.put(`/roles/${roleId}/permissions`, {
+      permissionIds,
+    });
     return response.data;
   },
 

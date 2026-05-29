@@ -26,14 +26,44 @@ export type AuditLog = {
   } | null;
 };
 
+export type AuditLogFilter = {
+  projectId?: number;
+  userId?: number;
+  module?: string;
+  action?: string;
+  take?: number;
+};
+
 export const auditApi = {
-  findAll: async (): Promise<AuditLog[]> => {
-    const response = await api.get('/audit-logs');
+  findAll: async (filter: AuditLogFilter = {}): Promise<AuditLog[]> => {
+    const response = await api.get('/audit-logs', { params: filter });
+    return response.data;
+  },
+
+  findOne: async (id: number): Promise<AuditLog> => {
+    const response = await api.get(`/audit-logs/${id}`);
     return response.data;
   },
 
   findByProject: async (projectId: number): Promise<AuditLog[]> => {
     const response = await api.get(`/audit-logs/project/${projectId}`);
+    return response.data;
+  },
+
+  findByUser: async (userId: number): Promise<AuditLog[]> => {
+    const response = await api.get(`/audit-logs/user/${userId}`);
+    return response.data;
+  },
+
+  remove: async (id: number): Promise<AuditLog> => {
+    const response = await api.delete(`/audit-logs/${id}`);
+    return response.data;
+  },
+
+  clearOld: async (before: string): Promise<{ count: number }> => {
+    const response = await api.delete('/audit-logs', {
+      params: { before },
+    });
     return response.data;
   },
 };
