@@ -7,7 +7,6 @@ import {
   ParseIntPipe,
   Patch,
   Post,
-  Req,
   UseGuards,
 } from '@nestjs/common';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
@@ -45,10 +44,15 @@ export class TasksController {
   ) {
     return this.tasksService.update(id, dto, Number(user.sub));
   }
-@Patch(':id/activate')
-activate(@Param('id', ParseIntPipe) id: number, @Req() req: any) {
-  return this.tasksService.activate(id, Number(req.user?.sub));
-}
+
+  @Patch(':id/activate')
+  activate(
+    @Param('id', ParseIntPipe) id: number,
+    @CurrentUser() user: any,
+  ) {
+    return this.tasksService.activate(id, Number(user.sub));
+  }
+
   @Delete(':id')
   remove(@Param('id', ParseIntPipe) id: number, @CurrentUser() user: any) {
     return this.tasksService.remove(id, Number(user.sub));

@@ -1,9 +1,10 @@
 import {
   BadRequestException,
+  ConflictException,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { AuditAction } from '@prisma/client';
+import { AuditAction, Prisma } from '@prisma/client';
 import { AuditService } from '../audit/audit.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateTaskDependencyDto } from './dto/create-task-dependency.dto';
@@ -32,40 +33,59 @@ export class TasksService {
       assignedToId: dto.assignedToId,
     });
 
-    const task = await this.prisma.task.create({
-      data: {
-        projectId: dto.projectId,
-        wbsItemId: dto.wbsItemId ?? null,
-        parentTaskId: dto.parentTaskId ?? null,
-        code: dto.code,
-        name: dto.name,
-        description: dto.description ?? null,
-        status: dto.status ?? 'NOT_STARTED',
-        priority: dto.priority ?? 'MEDIUM',
-        plannedStart: dto.plannedStart ? new Date(dto.plannedStart) : null,
-        plannedEnd: dto.plannedEnd ? new Date(dto.plannedEnd) : null,
-        actualStart: dto.actualStart ? new Date(dto.actualStart) : null,
-        actualEnd: dto.actualEnd ? new Date(dto.actualEnd) : null,
-        durationDays: dto.durationDays ?? null,
-        progress: dto.progress ?? 0,
-        assignedToId: dto.assignedToId ?? null,
-        isActive: true,
-      },
-      include: this.taskInclude(),
-    });
+    try {
+      const task = await this.prisma.$transaction(async (tx) => {
+        const code = await this.generateTaskCode(dto.projectId, tx);
 
-    await this.auditService.create({
-      userId,
-      projectId: task.projectId,
-      action: AuditAction.CREATE,
-      module: 'tasks',
-      entityName: 'Task',
-      entityId: String(task.id),
-      description: `Created task ${task.code} - ${task.name}`,
-      newData: task,
-    });
+        return tx.task.create({
+          data: {
+            projectId: dto.projectId,
+            wbsItemId: dto.wbsItemId ?? null,
+            parentTaskId: dto.parentTaskId ?? null,
+            code,
+            name: dto.name,
+            description: dto.description ?? null,
+            status: dto.status ?? 'NOT_STARTED',
+            priority: dto.priority ?? 'MEDIUM',
+            plannedStart: dto.plannedStart ? new Date(dto.plannedStart) : null,
+            plannedEnd: dto.plannedEnd ? new Date(dto.plannedEnd) : null,
+            actualStart: dto.actualStart ? new Date(dto.actualStart) : null,
+            actualEnd: dto.actualEnd ? new Date(dto.actualEnd) : null,
+            durationDays: dto.durationDays ?? null,
+            progress: dto.progress ?? 0,
+            assignedToId: dto.assignedToId ?? null,
+            isActive: true,
+          },
+          include: this.taskInclude(),
+        });
+      });
 
-    return task;
+      await this.auditService.create({
+        userId,
+        projectId: task.projectId,
+        action: AuditAction.CREATE,
+        module: 'tasks',
+        entityName: 'Task',
+        entityId: String(task.id),
+        description: `Created task ${task.code} - ${task.name}`,
+        newData: task,
+      });
+
+      await this.recalculateParentProgress(task.parentTaskId);
+
+      return task;
+    } catch (error) {
+      if (
+        error instanceof Prisma.PrismaClientKnownRequestError &&
+        error.code === 'P2002'
+      ) {
+        throw new ConflictException(
+          'Task code already exists for this project. Please try again.',
+        );
+      }
+
+      throw error;
+    }
   }
 
   findByProject(projectId: number) {
@@ -116,7 +136,6 @@ export class TasksService {
         projectId: dto.projectId,
         wbsItemId: dto.wbsItemId,
         parentTaskId: dto.parentTaskId,
-        code: dto.code,
         name: dto.name,
         description: dto.description,
         status: dto.status,
@@ -143,6 +162,15 @@ export class TasksService {
       oldData: oldTask,
       newData: updatedTask,
     });
+
+    await this.recalculateParentProgress(updatedTask.parentTaskId);
+
+    if (
+      oldTask.parentTaskId &&
+      oldTask.parentTaskId !== updatedTask.parentTaskId
+    ) {
+      await this.recalculateParentProgress(oldTask.parentTaskId);
+    }
 
     return updatedTask;
   }
@@ -171,6 +199,8 @@ export class TasksService {
       newData: deactivatedTask,
     });
 
+    await this.recalculateParentProgress(oldTask.parentTaskId);
+
     return deactivatedTask;
   }
 
@@ -197,6 +227,8 @@ export class TasksService {
       oldData: oldTask,
       newData: activatedTask,
     });
+
+    await this.recalculateParentProgress(activatedTask.parentTaskId);
 
     return activatedTask;
   }
@@ -281,13 +313,100 @@ export class TasksService {
     return deleted;
   }
 
+  private async recalculateParentProgress(parentTaskId?: number | null) {
+    if (!parentTaskId) return;
+
+    const subtasks = await this.prisma.task.findMany({
+      where: {
+        parentTaskId,
+        isActive: true,
+      },
+      select: {
+        progress: true,
+        durationDays: true,
+      },
+    });
+
+    if (subtasks.length === 0) return;
+
+    const totalDuration = subtasks.reduce(
+      (sum, task) => sum + Number(task.durationDays ?? 0),
+      0,
+    );
+
+    let calculatedProgress = 0;
+
+    if (totalDuration > 0) {
+      const weightedProgress = subtasks.reduce((sum, task) => {
+        const progress = Number(task.progress ?? 0);
+        const duration = Number(task.durationDays ?? 0);
+
+        return sum + progress * duration;
+      }, 0);
+
+      calculatedProgress = Math.round(weightedProgress / totalDuration);
+    } else {
+      const totalProgress = subtasks.reduce(
+        (sum, task) => sum + Number(task.progress ?? 0),
+        0,
+      );
+
+      calculatedProgress = Math.round(totalProgress / subtasks.length);
+    }
+
+    await this.prisma.task.update({
+      where: { id: parentTaskId },
+      data: {
+        progress: calculatedProgress,
+        status:
+          calculatedProgress === 100
+            ? 'COMPLETED'
+            : calculatedProgress > 0
+              ? 'IN_PROGRESS'
+              : 'NOT_STARTED',
+      },
+    });
+  }
+
+  private async generateTaskCode(
+    projectId: number,
+    tx: Prisma.TransactionClient = this.prisma,
+  ): Promise<string> {
+    const lastTask = await tx.task.findFirst({
+      where: {
+        projectId,
+        code: {
+          startsWith: 'T-',
+        },
+      },
+      orderBy: {
+        id: 'desc',
+      },
+      select: {
+        code: true,
+      },
+    });
+
+    if (!lastTask?.code) {
+      return 'T-001';
+    }
+
+    const lastNumber = Number(lastTask.code.replace('T-', ''));
+
+    if (Number.isNaN(lastNumber)) {
+      return `T-${Date.now()}`;
+    }
+
+    return `T-${String(lastNumber + 1).padStart(3, '0')}`;
+  }
+
   private async validateTaskRelations(
     projectId: number,
     options: {
       taskId?: number;
-      wbsItemId?: number;
-      parentTaskId?: number;
-      assignedToId?: number;
+      wbsItemId?: number | null;
+      parentTaskId?: number | null;
+      assignedToId?: number | null;
     },
   ) {
     if (options.wbsItemId) {
@@ -351,6 +470,7 @@ export class TasksService {
           name: true,
           status: true,
           progress: true,
+          durationDays: true,
         },
       },
       predecessors: {

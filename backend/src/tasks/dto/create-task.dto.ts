@@ -1,9 +1,11 @@
 import {
   IsDateString,
   IsEnum,
-  IsNumber,
+  IsInt,
   IsOptional,
   IsString,
+  Max,
+  Min,
 } from 'class-validator';
 
 export enum TaskStatusDto {
@@ -22,19 +24,16 @@ export enum TaskPriorityDto {
 }
 
 export class CreateTaskDto {
-  @IsNumber()
+  @IsInt()
   projectId!: number;
 
   @IsOptional()
-  @IsNumber()
+  @IsInt()
   wbsItemId?: number;
 
   @IsOptional()
-  @IsNumber()
+  @IsInt()
   parentTaskId?: number;
-
-  @IsString()
-  code!: string;
 
   @IsString()
   name!: string;
@@ -68,14 +67,17 @@ export class CreateTaskDto {
   actualEnd?: string;
 
   @IsOptional()
-  @IsNumber()
+  @IsInt()
+  @Min(0)
   durationDays?: number;
 
   @IsOptional()
-  @IsNumber()
+  @IsInt()
+  @Min(0)
+  @Max(100)
   progress?: number;
 
   @IsOptional()
-  @IsNumber()
+  @IsInt()
   assignedToId?: number;
 }
