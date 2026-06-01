@@ -228,14 +228,19 @@ enum VariationStatus {
   REJECTED
 }
 model ContactInquiry {
-  id        String   @id @default(cuid())
+  id        Int      @id @default(autoincrement())
   name      String
   email     String
   phone     String?
   company   String?
   subject   String?
-  message   String
+  message   String   @db.Text
+  status    String   @default("NEW")
+  isRead    Boolean  @default(false)
   createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("contact_inquiries")
 }
 model User {
   id           Int        @id @default(autoincrement())
