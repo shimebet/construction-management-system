@@ -17,18 +17,25 @@ export type Task = {
   durationDays?: number | null;
   progress: string | number;
   assignedToId?: number | null;
+  isActive: boolean;
   wbsItem?: {
     id: number;
     code: string;
     name: string;
   } | null;
+  subtasks?: {
+    id: number;
+    code: string;
+    name: string;
+    status: string;
+    progress: string | number;
+  }[];
 };
 
 export type CreateTaskPayload = {
   projectId: number;
   wbsItemId?: number | null;
   parentTaskId?: number | null;
-  code: string;
   name: string;
   description?: string;
   status?: string;
@@ -39,6 +46,8 @@ export type CreateTaskPayload = {
   progress?: number;
   assignedToId?: number;
 };
+
+export type UpdateTaskPayload = Partial<CreateTaskPayload>;
 
 export const tasksApi = {
   findByProject: async (projectId: number): Promise<Task[]> => {
@@ -51,10 +60,7 @@ export const tasksApi = {
     return response.data;
   },
 
-  update: async (
-    id: number,
-    data: Partial<CreateTaskPayload>,
-  ): Promise<Task> => {
+  update: async (id: number, data: UpdateTaskPayload): Promise<Task> => {
     const response = await api.patch(`/tasks/${id}`, data);
     return response.data;
   },
@@ -63,8 +69,9 @@ export const tasksApi = {
     const response = await api.delete(`/tasks/${id}`);
     return response.data;
   },
+
   activate: async (id: number): Promise<Task> => {
-  const response = await api.patch(`/tasks/${id}/activate`);
-  return response.data;
-},
+    const response = await api.patch(`/tasks/${id}/activate`);
+    return response.data;
+  },
 };

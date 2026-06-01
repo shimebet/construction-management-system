@@ -14,7 +14,6 @@ const emptyForm: CreateTaskPayload = {
   projectId: 0,
   wbsItemId: null,
   parentTaskId: null,
-  code: '',
   name: '',
   description: '',
   status: 'NOT_STARTED',
@@ -104,25 +103,25 @@ export default function TasksPage() {
   }
 
   function handleEdit(task: Task) {
-    setEditingTask(task);
+  setEditingTask(task);
 
-    setForm({
-      projectId: task.projectId,
-      wbsItemId: task.wbsItemId ?? null,
-      parentTaskId: task.parentTaskId ?? null,
-      code: task.code,
-      name: task.name,
-      description: task.description || '',
-      status: task.status,
-      priority: task.priority,
-      plannedStart: task.plannedStart?.slice(0, 10) || '',
-      plannedEnd: task.plannedEnd?.slice(0, 10) || '',
-      durationDays: task.durationDays ?? undefined,
-      progress: task.progress ?? 0,
-    });
+  setForm({
+    projectId: task.projectId,
+    wbsItemId: task.wbsItemId ?? null,
+    parentTaskId: task.parentTaskId ?? null,
+    name: task.name,
+    description: task.description || '',
+    status: task.status,
+    priority: task.priority,
+    plannedStart: task.plannedStart?.slice(0, 10) || '',
+    plannedEnd: task.plannedEnd?.slice(0, 10) || '',
+    durationDays: task.durationDays ?? undefined,
+    progress: Number(task.progress ?? 0),
+    assignedToId: task.assignedToId ?? undefined,
+  });
 
-    setMessage('');
-  }
+  setMessage('');
+}
 
   function cancelEdit() {
     setEditingTask(null);
@@ -152,6 +151,7 @@ export default function TasksPage() {
         parentTaskId: form.parentTaskId ? Number(form.parentTaskId) : null,
         durationDays: form.durationDays ? Number(form.durationDays) : undefined,
         progress: form.progress ? Number(form.progress) : 0,
+        assignedToId: form.assignedToId ? Number(form.assignedToId) : undefined,
       };
 
       if (editingTask) {
@@ -190,7 +190,6 @@ export default function TasksPage() {
       setMessage('');
 
       await tasksApi.remove(id);
-
       setMessage('Task deactivated successfully');
 
       if (selectedProjectId) {
@@ -209,7 +208,6 @@ export default function TasksPage() {
       setMessage('');
 
       await tasksApi.activate(id);
-
       setMessage('Task activated successfully');
 
       if (selectedProjectId) {
@@ -298,13 +296,6 @@ export default function TasksPage() {
               </SelectField>
 
               <Input
-                label="Task Code"
-                value={form.code}
-                onChange={(e) => updateField('code', e.target.value)}
-                required
-              />
-
-              <Input
                 label="Task Name"
                 value={form.name}
                 onChange={(e) => updateField('name', e.target.value)}
@@ -366,14 +357,22 @@ export default function TasksPage() {
                 }
               />
 
-              <Input
-                label="Progress %"
-                type="number"
-                min={0}
-                max={100}
-                value={form.progress ?? 0}
-                onChange={(e) => updateField('progress', Number(e.target.value))}
-              />
+          {!editingTask?.subtasks?.length && (
+            <Input
+              label="Progress %"
+              type="number"
+              min={0}
+              max={100}
+              value={form.progress ?? 0}
+              onChange={(e) => updateField('progress', Number(e.target.value))}
+            />
+          )}
+
+          {editingTask?.subtasks?.length ? (
+            <p style={{ marginBottom: 12, color: '#64748b', fontSize: 14 }}>
+              Progress is automatically calculated from subtasks.
+            </p>
+          ) : null}
 
               <div style={{ display: 'flex', gap: 10 }}>
                 <Button disabled={loading} style={{ flex: 1 }}>
