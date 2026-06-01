@@ -1,9 +1,11 @@
 import { useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { authApi } from '../../api/auth.api';
 import { Button, Input } from '../../components/ui';
 
 export default function LoginPage() {
+  const navigate = useNavigate();
+
   const [email, setEmail] = useState('admin@buildpro.com');
   const [password, setPassword] = useState('123456');
   const [loading, setLoading] = useState(false);
@@ -11,6 +13,8 @@ export default function LoginPage() {
 
   async function handleLogin(e: React.FormEvent) {
     e.preventDefault();
+
+    if (loading) return;
 
     try {
       setLoading(true);
@@ -26,12 +30,14 @@ export default function LoginPage() {
       const profile = await authApi.me();
       localStorage.setItem('authUser', JSON.stringify(profile));
 
-      window.location.href = '/dashboard';
+      navigate('/dashboard', {
+        replace: true,
+      });
     } catch (error: any) {
       localStorage.removeItem('accessToken');
       localStorage.removeItem('authUser');
 
-      setMessage(error.response?.data?.message || 'Login failed');
+      setMessage(error.response?.data?.message || 'Invalid email or password');
     } finally {
       setLoading(false);
     }
@@ -39,6 +45,15 @@ export default function LoginPage() {
 
   return (
     <div className="auth-page">
+      {loading && (
+        <div className="auth-loading-overlay">
+          <div className="auth-loading-card">
+            <Spinner />
+            <p>Authenticating...</p>
+          </div>
+        </div>
+      )}
+
       <div className="auth-card">
         <div className="auth-brand">
           <h1>BuildPro IMS</h1>
@@ -55,6 +70,7 @@ export default function LoginPage() {
             label="Email"
             type="email"
             value={email}
+            disabled={loading}
             onChange={(e) => setEmail(e.target.value)}
             required
           />
@@ -63,12 +79,30 @@ export default function LoginPage() {
             label="Password"
             type="password"
             value={password}
+            disabled={loading}
             onChange={(e) => setPassword(e.target.value)}
             required
           />
 
-          <Button disabled={loading} style={{ width: '100%', marginTop: 8 }}>
-            {loading ? 'Signing in...' : 'Sign In'}
+          <Button
+            disabled={loading}
+            style={{
+              width: '100%',
+              marginTop: 8,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: 8,
+            }}
+          >
+            {loading ? (
+              <>
+                <Spinner />
+                <span>Signing in...</span>
+              </>
+            ) : (
+              'Sign In'
+            )}
           </Button>
         </form>
 
@@ -78,4 +112,8 @@ export default function LoginPage() {
       </div>
     </div>
   );
+}
+
+function Spinner() {
+  return <span className="auth-spinner" />;
 }

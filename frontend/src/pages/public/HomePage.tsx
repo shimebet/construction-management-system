@@ -1,13 +1,13 @@
+import { useState } from 'react';
 import { Link } from 'react-router-dom';
+import { contactApi } from '../../api/contact.api';
 import {
   ArrowRight,
   Award,
   BarChart3,
   Building2,
   CheckCircle2,
-  ClipboardCheck,
   FileCheck2,
-  FileText,
   HardHat,
   Landmark,
   MapPinned,
@@ -115,9 +115,62 @@ const standards = [
   'PMI Project Management Practices',
 ];
 
-const clients = ['Government', 'Developers', 'Contractors', 'Consultants', 'Industrial Clients'];
+const clients = [
+  'Government',
+  'Developers',
+  'Contractors',
+  'Consultants',
+  'Industrial Clients',
+];
 
 export default function HomePage() {
+  const [contactForm, setContactForm] = useState({
+    name: '',
+    email: '',
+    phone: '',
+    company: '',
+    subject: '',
+    message: '',
+  });
+
+  const [contactLoading, setContactLoading] = useState(false);
+  const [contactMessage, setContactMessage] = useState('');
+
+  function updateContactField(field: keyof typeof contactForm, value: string) {
+    setContactForm((prev) => ({
+      ...prev,
+      [field]: value,
+    }));
+  }
+
+  async function handleContactSubmit(e: React.FormEvent) {
+    e.preventDefault();
+
+    try {
+      setContactLoading(true);
+      setContactMessage('');
+
+      await contactApi.send(contactForm);
+
+      setContactMessage('Thank you. Your message has been sent successfully.');
+
+      setContactForm({
+        name: '',
+        email: '',
+        phone: '',
+        company: '',
+        subject: '',
+        message: '',
+      });
+    } catch (error: any) {
+      setContactMessage(
+        error.response?.data?.message || 'Failed to send message.',
+      );
+    } finally {
+      setContactLoading(false);
+    }
+  }
+
   return (
     <div className="company-public-page">
       <section className="company-hero">
@@ -137,9 +190,10 @@ export default function HomePage() {
           <h1>Engineering modern construction with digital project control.</h1>
 
           <p>
-            BuildPro IMS brings construction delivery, planning, document control,
-            procurement, quality, safety, cost, finance, reporting, and audit
-            visibility into one enterprise-grade construction management platform.
+            BuildPro IMS brings construction delivery, planning, document
+            control, procurement, quality, safety, cost, finance, reporting, and
+            audit visibility into one enterprise-grade construction management
+            platform.
           </p>
 
           <div className="company-hero-actions">
@@ -171,8 +225,8 @@ export default function HomePage() {
           <p>
             We deliver construction and infrastructure solutions for public,
             commercial, industrial, and urban development projects. BuildPro IMS
-            supports international-standard project management, document control,
-            quality, safety, cost, procurement, and finance.
+            supports international-standard project management, document
+            control, quality, safety, cost, procurement, and finance.
           </p>
         </div>
 
@@ -231,7 +285,12 @@ export default function HomePage() {
 
         <div className="company-about-grid">
           {featuredProjects.map(({ title, text, icon: Icon }) => (
-            <InfoCard key={title} icon={<Icon size={28} />} title={title} text={text} />
+            <InfoCard
+              key={title}
+              icon={<Icon size={28} />}
+              title={title}
+              text={text}
+            />
           ))}
         </div>
       </section>
@@ -305,31 +364,116 @@ export default function HomePage() {
       </section>
 
       <section id="contact" className="company-section company-light-section">
-        <div className="company-contact-card">
-          <div>
+        <div className="company-contact-wrapper">
+          <div className="company-contact-info">
             <span>Contact Us</span>
-            <h2>Ready to build projects digitally?</h2>
+
+            <h2>Ready to Build the Future Together?</h2>
+
             <p>
-              Contact us for construction services, infrastructure delivery,
-              project management, industrial park development, smart city
-              projects, and BuildPro IMS implementation.
+              Contact BuildPro for construction services, infrastructure
+              development, project management consulting, smart city initiatives,
+              and BuildPro IMS implementation.
             </p>
+
+            <div className="company-contact-details">
+              <div>
+                <strong>Email</strong>
+                <p>info@buildproims.com</p>
+              </div>
+
+              <div>
+                <strong>Phone</strong>
+                <p>+251 900 000 000</p>
+              </div>
+
+              <div>
+                <strong>Head Office</strong>
+                <p>Addis Ababa, Ethiopia</p>
+              </div>
+
+              <div>
+                <strong>Business Hours</strong>
+                <p>Monday - Friday: 8:00 AM - 5:00 PM</p>
+              </div>
+
+              <div>
+                <strong>Website</strong>
+                <p>www.buildproims.com</p>
+              </div>
+            </div>
+
+            <div className="company-social-links">
+              <a href="#">LinkedIn</a>
+              <a href="#">Facebook</a>
+              <a href="#">X (Twitter)</a>
+              <a href="#">YouTube</a>
+            </div>
           </div>
 
-          <div className="company-contact-details">
-            <p>
-              <strong>Email:</strong> info@buildproims.com
-            </p>
-            <p>
-              <strong>Phone:</strong> +251 900 000 000
-            </p>
-            <p>
-              <strong>Location:</strong> Addis Ababa, Ethiopia
-            </p>
-            <p>
-              <strong>Services:</strong> Construction, Infrastructure, Real
-              Estate, Smart Cities, and Digital Project Management
-            </p>
+          <div className="company-contact-form">
+            <h3>Send us a message</h3>
+
+            {contactMessage && (
+              <div className="company-contact-message">{contactMessage}</div>
+            )}
+
+            <form onSubmit={handleContactSubmit}>
+              <input
+                type="text"
+                placeholder="Full Name"
+                value={contactForm.name}
+                onChange={(e) => updateContactField('name', e.target.value)}
+                disabled={contactLoading}
+                required
+              />
+
+              <input
+                type="email"
+                placeholder="Email Address"
+                value={contactForm.email}
+                onChange={(e) => updateContactField('email', e.target.value)}
+                disabled={contactLoading}
+                required
+              />
+
+              <input
+                type="tel"
+                placeholder="Phone Number"
+                value={contactForm.phone}
+                onChange={(e) => updateContactField('phone', e.target.value)}
+                disabled={contactLoading}
+              />
+
+              <input
+                type="text"
+                placeholder="Company Name"
+                value={contactForm.company}
+                onChange={(e) => updateContactField('company', e.target.value)}
+                disabled={contactLoading}
+              />
+
+              <input
+                type="text"
+                placeholder="Subject"
+                value={contactForm.subject}
+                onChange={(e) => updateContactField('subject', e.target.value)}
+                disabled={contactLoading}
+              />
+
+              <textarea
+                rows={5}
+                placeholder="How can we help you?"
+                value={contactForm.message}
+                onChange={(e) => updateContactField('message', e.target.value)}
+                disabled={contactLoading}
+                required
+              />
+
+              <button type="submit" disabled={contactLoading}>
+                {contactLoading ? 'Sending...' : 'Send Message'}
+              </button>
+            </form>
           </div>
         </div>
       </section>

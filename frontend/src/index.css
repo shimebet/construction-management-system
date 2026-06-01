@@ -1044,3 +1044,119 @@ a {
     grid-template-columns: 1fr;
   }
 }
+.auth-loading-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(255, 255, 255, 0.72);
+  backdrop-filter: blur(3px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 9999;
+}
+
+.auth-loading-card {
+  background: #ffffff;
+  padding: 24px 28px;
+  border-radius: 14px;
+  box-shadow: 0 18px 45px rgba(15, 23, 42, 0.18);
+  text-align: center;
+  min-width: 220px;
+}
+
+.auth-loading-card p {
+  margin-top: 12px;
+  margin-bottom: 0;
+  font-weight: 600;
+  color: #334155;
+}
+
+.auth-spinner {
+  width: 18px;
+  height: 18px;
+  border: 2px solid rgba(37, 99, 235, 0.25);
+  border-top-color: #2563eb;
+  border-radius: 50%;
+  display: inline-block;
+  animation: auth-spin 0.75s linear infinite;
+}
+
+button .auth-spinner {
+  width: 16px;
+  height: 16px;
+  border-color: rgba(255, 255, 255, 0.35);
+  border-top-color: #ffffff;
+}
+
+@keyframes auth-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+
+
+.company-contact-wrapper {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 4rem;
+  align-items: start;
+}
+
+.company-contact-details {
+  display: grid;
+  gap: 1rem;
+  margin-top: 2rem;
+}
+
+.company-contact-form form {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.company-contact-form input,
+.company-contact-form textarea {
+  width: 100%;
+  padding: 1rem;
+  border: 1px solid #dbe3ec;
+  border-radius: 12px;
+}
+
+.company-contact-form button {
+  padding: 1rem;
+  border: none;
+  border-radius: 12px;
+  cursor: pointer;
+  background: #0f172a;
+  color: white;
+  font-weight: 600;
+}
+
+.company-social-links {
+  display: flex;
+  gap: 1rem;
+  margin-top: 2rem;
+}
+
+@media (max-width: 768px) {
+  .company-contact-wrapper {
+    grid-template-columns: 1fr;
+  }
+}
+
+.company-contact-message {
+  margin-bottom: 1rem;
+  padding: 0.85rem 1rem;
+  border-radius: 12px;
+  background: #ecfdf5;
+  color: #047857;
+  font-weight: 600;
+}
+
+.company-contact-form button:disabled,
+.company-contact-form input:disabled,
+.company-contact-form textarea:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
+}
