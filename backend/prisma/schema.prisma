@@ -227,7 +227,16 @@ enum VariationStatus {
   APPROVED
   REJECTED
 }
-
+model ContactInquiry {
+  id        String   @id @default(cuid())
+  name      String
+  email     String
+  phone     String?
+  company   String?
+  subject   String?
+  message   String
+  createdAt DateTime @default(now())
+}
 model User {
   id           Int        @id @default(autoincrement())
   name         String

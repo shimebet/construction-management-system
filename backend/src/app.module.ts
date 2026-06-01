@@ -27,6 +27,7 @@ import { CostModule } from './cost/cost.module';
 import { FinanceModule } from './finance/finance.module';
 import { ProfileModule } from './profile/profile.module';
 import { NotificationsModule } from './notifications/notifications.module';
+import { ContactModule } from './contact/contact.module';
 
 @Module({
   imports: [
@@ -49,6 +50,7 @@ import { NotificationsModule } from './notifications/notifications.module';
     NotificationsModule,
     QualityModule,
     SafetyModule,
+    ContactModule,
     ProcurementModule,
     InventoryModule,
     CostModule,
