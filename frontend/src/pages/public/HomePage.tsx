@@ -41,12 +41,12 @@ const sectors = [
     image:
       'https://images.unsplash.com/photo-1513828583688-c52646db42da?auto=format&fit=crop&w=1200&q=80',
   },
-  {
-    title: 'Smart City Construction',
-    text: 'Digitally connected urban infrastructure, intelligent transportation, and sustainable city systems.',
-    image:
-      'https://images.unsplash.com/photo-1480714378408-67cf0d13bc1f?auto=format&fit=crop&w=1200&q=80',
-  },
+{
+  title: 'Smart City Construction',
+  text: 'Digitally connected urban infrastructure, intelligent transportation, and sustainable city systems.',
+  image:
+    'https://images.unsplash.com/photo-1519501025264-65ba15a82390?auto=format&fit=crop&w=1200&q=80',
+},
   {
     title: 'Infrastructure Projects',
     text: 'Large-scale public and private infrastructure projects with integrated planning and project controls.',
@@ -526,8 +526,12 @@ function InfoCard({
 }) {
   return (
     <div className="company-info-card">
-      <div className="company-info-icon">{icon}</div>
+      <div className="company-info-icon">
+        {icon}
+      </div>
+
       <h3>{title}</h3>
+
       <p>{text}</p>
     </div>
   );

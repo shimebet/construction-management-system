@@ -1160,3 +1160,159 @@ button .auth-spinner {
   opacity: 0.7;
   cursor: not-allowed;
 }
+
+.company-sector-card {
+  background: #fff;
+  border-radius: 20px;
+  overflow: hidden;
+  box-shadow: 0 12px 30px rgba(15, 23, 42, 0.08);
+  transition:
+    transform 0.35s ease,
+    box-shadow 0.35s ease;
+}
+
+.company-sector-card:hover {
+  transform: translateY(-8px);
+  box-shadow: 0 20px 40px rgba(15, 23, 42, 0.15);
+}
+
+.company-sector-card img {
+  width: 100%;
+  height: 260px;
+  object-fit: cover;
+
+  /* Starts zoomed in */
+  transform: scale(1.08);
+
+  transition:
+    transform 0.8s ease,
+    filter 0.5s ease;
+}
+
+.company-sector-card:hover img {
+  /* Zoom out on hover */
+  transform: scale(1);
+
+  filter: brightness(1.05);
+}
+
+.company-sector-card h3 {
+  margin-bottom: 0.75rem;
+}
+
+.company-sector-card div {
+  padding: 1.5rem;
+}
+
+.company-sector-card {
+  position: relative;
+}
+
+.company-sector-card img {
+  display: block;
+}
+
+.company-sector-card::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    to top,
+    rgba(0,0,0,0.5),
+    rgba(0,0,0,0.05)
+  );
+
+  opacity: 0;
+  transition: opacity 0.4s ease;
+}
+
+.company-sector-card:hover::after {
+  opacity: 1;
+}
+
+.company-info-card {
+  background: #ffffff;
+  padding: 2rem;
+  border-radius: 20px;
+  text-align: center;
+
+  box-shadow: 0 12px 30px rgba(15, 23, 42, 0.08);
+
+  transition:
+    transform 0.35s ease,
+    box-shadow 0.35s ease;
+}
+
+.company-info-card:hover {
+  transform: translateY(-8px);
+
+  box-shadow: 0 20px 40px rgba(15, 23, 42, 0.15);
+}
+
+.company-info-icon {
+  width: 72px;
+  height: 72px;
+
+  margin: 0 auto 1.5rem;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  border-radius: 50%;
+
+  background: #eff6ff;
+  color: #2563eb;
+
+  /* Starts zoomed in */
+  transform: scale(1.15);
+
+  transition:
+    transform 0.6s ease,
+    background 0.3s ease;
+}
+
+.company-info-card:hover .company-info-icon {
+  /* Zoom out */
+  transform: scale(1);
+
+  background: #dbeafe;
+}
+
+.company-info-card h3 {
+  margin-bottom: 0.75rem;
+  color: #0f172a;
+}
+
+.company-info-card p {
+  color: #64748b;
+  line-height: 1.7;
+} 
+
+.company-info-card {
+  position: relative;
+  overflow: hidden;
+}
+
+.company-info-card::before {
+  content: '';
+
+  position: absolute;
+  top: 0;
+  left: 0;
+
+  width: 100%;
+  height: 4px;
+
+  background: #2563eb;
+
+  transform: scaleX(0);
+
+  transform-origin: left;
+
+  transition: transform 0.35s ease;
+}
+
+.company-info-card:hover::before {
+  transform: scaleX(1);
+}
