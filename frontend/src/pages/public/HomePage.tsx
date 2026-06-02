@@ -74,6 +74,8 @@ const modules = [
   'Notifications',
 ];
 
+
+
 const stats = [
   { label: 'Projects Delivered', value: '500+', icon: Building2 },
   { label: 'Active Platform Users', value: '1,500+', icon: Users },

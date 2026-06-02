@@ -1316,3 +1316,34 @@ button .auth-spinner {
 .company-info-card:hover::before {
   transform: scaleX(1);
 }
+
+
+.company-module-card {
+  position: relative;
+  transition: all 0.3s ease;
+  cursor: pointer;
+  overflow: visible;
+}
+
+.company-module-card:hover {
+  transform: translateY(-6px);
+  box-shadow: 0 12px 30px rgba(37, 99, 235, 0.25);
+}
+
+.company-module-card::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  bottom: -28px;
+  width: 2px;
+  height: 28px;
+  background: linear-gradient(to bottom, #2563eb, transparent);
+
+  transform: translateX(-50%) scaleY(0);
+  transform-origin: top;
+  transition: transform 0.35s ease;
+}
+
+.company-module-card:hover::after {
+  transform: translateX(-50%) scaleY(1);
+}
