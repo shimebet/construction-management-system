@@ -28,6 +28,28 @@ export default function UsersPage() {
     status: 'ACTIVE',
   });
 
+  const [createForm, setCreateForm] = useState({
+    name: '',
+    email: '',
+    password: '123456',
+    phone: '',
+    jobTitle: '',
+    employeeId: '',
+    department: '',
+    employmentType: 'FULL_TIME',
+    gender: '',
+    nationality: '',
+    address: '',
+    emergencyName: '',
+    emergencyPhone: '',
+    educationLevel: '',
+    fieldOfStudy: '',
+    institution: '',
+    graduationYear: '',
+    yearsExperience: '',
+    previousCompany: '',
+  });
+
   const [companyForm, setCompanyForm] = useState({
     companyId: '',
     userId: '',
@@ -47,154 +69,80 @@ export default function UsersPage() {
 
   const isSuccess = message.toLowerCase().includes('successfully');
 
- useEffect(() => {
-  loadData({ clearMessage: true });
-}, []);
-async function loadData(options?: { clearMessage?: boolean }) {
-  try {
-    setLoading(true);
+  useEffect(() => {
+    loadData({ clearMessage: true });
+  }, []);
 
-    if (options?.clearMessage) {
-      setMessage('');
-    }
-
-    const [userData, companyData, projectData, roleData] = await Promise.all([
-      usersApi.findAll(),
-      companiesApi.findAll(),
-      projectsApi.findAll(),
-      settingsApi.findRoles(),
-    ]);
-
-    setUsers(userData);
-    setCompanies(companyData);
-    setProjects(projectData);
-    setRoles(roleData);
-  } catch (error: any) {
-    setMessage(error.response?.data?.message || 'Failed to load users data');
-  } finally {
-    setLoading(false);
-  }
-}
-const [createForm, setCreateForm] = useState({
-  name: '',
-  email: '',
-  password: '123456',
-  phone: '',
-  jobTitle: '',
-  employeeId: '',
-  department: '',
-  employmentType: 'FULL_TIME',
-  gender: '',
-  nationality: '',
-  address: '',
-  emergencyName: '',
-  emergencyPhone: '',
-  educationLevel: '',
-  fieldOfStudy: '',
-  institution: '',
-  graduationYear: '',
-  yearsExperience: '',
-  previousCompany: '',
-});
-
-async function handleCreateUser(e: React.FormEvent) {
-  e.preventDefault();
-
-  try {
-    setLoading(true);
-    setMessage('');
-
-    await usersApi.create({
-      ...createForm,
-      graduationYear: createForm.graduationYear
-        ? Number(createForm.graduationYear)
-        : undefined,
-      yearsExperience: createForm.yearsExperience
-        ? Number(createForm.yearsExperience)
-        : undefined,
-    });
-
-    setMessage('Employee user created successfully');
-await loadData();
-
-    setCreateForm({
-      name: '',
-      email: '',
-      password: '123456',
-      phone: '',
-      jobTitle: '',
-      employeeId: '',
-      department: '',
-      employmentType: 'FULL_TIME',
-      gender: '',
-      nationality: '',
-      address: '',
-      emergencyName: '',
-      emergencyPhone: '',
-      educationLevel: '',
-      fieldOfStudy: '',
-      institution: '',
-      graduationYear: '',
-      yearsExperience: '',
-      previousCompany: '',
-    });
-
-    await loadData();
-  } catch (error: any) {
-    setMessage(error.response?.data?.message || 'Failed to create employee user');
-  } finally {
-    setLoading(false);
-  }
-}
-  async function assignCompanyUser(e: React.FormEvent) {
-    e.preventDefault();
-
-    if (!companyForm.companyId || !companyForm.userId || !companyForm.roleId) {
-      setMessage('Select company, user, and role first');
-      return;
-    }
-
+  async function loadData(options?: { clearMessage?: boolean }) {
     try {
       setLoading(true);
 
-      await usersApi.assignToCompany(Number(companyForm.companyId), {
-        userId: Number(companyForm.userId),
-        roleId: Number(companyForm.roleId),
-        status: companyForm.status as 'ACTIVE' | 'INACTIVE',
-      });
+      if (options?.clearMessage) {
+        setMessage('');
+      }
 
-      setMessage('User assigned to company successfully');
-      setCompanyForm({ companyId: '', userId: '', roleId: '', status: 'ACTIVE' });
-      await loadData();
+      const [userData, companyData, projectData, roleData] = await Promise.all([
+        usersApi.findAll(),
+        companiesApi.findAll(),
+        projectsApi.findAll(),
+        settingsApi.findRoles(),
+      ]);
+
+      setUsers(userData);
+      setCompanies(companyData);
+      setProjects(projectData);
+      setRoles(roleData);
     } catch (error: any) {
-      setMessage(error.response?.data?.message || 'Failed to assign user to company');
+      setMessage(error.response?.data?.message || 'Failed to load users data');
     } finally {
       setLoading(false);
     }
   }
 
-  async function assignProjectUser(e: React.FormEvent) {
+  async function handleCreateUser(e: React.FormEvent) {
     e.preventDefault();
-
-    if (!projectForm.projectId || !projectForm.userId || !projectForm.roleId) {
-      setMessage('Select project, user, and role first');
-      return;
-    }
 
     try {
       setLoading(true);
+      setMessage('');
 
-      await usersApi.assignToProject(Number(projectForm.projectId), {
-        userId: Number(projectForm.userId),
-        roleId: Number(projectForm.roleId),
-        status: projectForm.status as 'ACTIVE' | 'INACTIVE',
+      await usersApi.create({
+        ...createForm,
+        graduationYear: createForm.graduationYear
+          ? Number(createForm.graduationYear)
+          : undefined,
+        yearsExperience: createForm.yearsExperience
+          ? Number(createForm.yearsExperience)
+          : undefined,
       });
 
-      setMessage('User assigned to project successfully');
-      setProjectForm({ projectId: '', userId: '', roleId: '', status: 'ACTIVE' });
+      setMessage('Employee user created successfully');
+
+      setCreateForm({
+        name: '',
+        email: '',
+        password: '123456',
+        phone: '',
+        jobTitle: '',
+        employeeId: '',
+        department: '',
+        employmentType: 'FULL_TIME',
+        gender: '',
+        nationality: '',
+        address: '',
+        emergencyName: '',
+        emergencyPhone: '',
+        educationLevel: '',
+        fieldOfStudy: '',
+        institution: '',
+        graduationYear: '',
+        yearsExperience: '',
+        previousCompany: '',
+      });
+
       await loadData();
     } catch (error: any) {
-      setMessage(error.response?.data?.message || 'Failed to assign user to project');
+      setMessage(error.response?.data?.message || 'Failed to create employee user');
     } finally {
       setLoading(false);
     }
@@ -221,6 +169,7 @@ await loadData();
 
     try {
       setLoading(true);
+      setMessage('');
 
       await usersApi.update(editingUser.id, {
         name: editForm.name,
@@ -241,15 +190,14 @@ await loadData();
     }
   }
 
-  async function handleDelete(id: number) {
-    const confirmed = window.confirm(
-      'Are you sure you want to deactivate this user?',
-    );
+  async function handleDeactivate(id: number) {
+    const confirmed = window.confirm('Are you sure you want to deactivate this user?');
 
     if (!confirmed) return;
 
     try {
       setLoading(true);
+      setMessage('');
 
       await usersApi.remove(id);
 
@@ -257,6 +205,106 @@ await loadData();
       await loadData();
     } catch (error: any) {
       setMessage(error.response?.data?.message || 'Failed to deactivate user');
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function handleActivate(id: number) {
+    const confirmed = window.confirm('Activate this user?');
+
+    if (!confirmed) return;
+
+    try {
+      setLoading(true);
+      setMessage('');
+
+      await usersApi.activate(id);
+
+      setMessage('User activated successfully');
+      await loadData();
+    } catch (error: any) {
+      setMessage(error.response?.data?.message || 'Failed to activate user');
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function handlePermanentDelete(id: number) {
+    const confirmed = window.confirm(
+      'This will permanently delete the user. This action cannot be undone.',
+    );
+
+    if (!confirmed) return;
+
+    try {
+      setLoading(true);
+      setMessage('');
+
+      await usersApi.permanentDelete(id);
+
+      setMessage('User deleted successfully');
+      await loadData();
+    } catch (error: any) {
+      setMessage(error.response?.data?.message || 'Failed to delete user');
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function assignCompanyUser(e: React.FormEvent) {
+    e.preventDefault();
+
+    if (!companyForm.companyId || !companyForm.userId || !companyForm.roleId) {
+      setMessage('Select company, user, and role first');
+      return;
+    }
+
+    try {
+      setLoading(true);
+      setMessage('');
+
+      await usersApi.assignToCompany(Number(companyForm.companyId), {
+        userId: Number(companyForm.userId),
+        roleId: Number(companyForm.roleId),
+        status: companyForm.status as 'ACTIVE' | 'INACTIVE',
+      });
+
+      setMessage('User assigned to company successfully');
+      setCompanyForm({ companyId: '', userId: '', roleId: '', status: 'ACTIVE' });
+
+      await loadData();
+    } catch (error: any) {
+      setMessage(error.response?.data?.message || 'Failed to assign user to company');
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function assignProjectUser(e: React.FormEvent) {
+    e.preventDefault();
+
+    if (!projectForm.projectId || !projectForm.userId || !projectForm.roleId) {
+      setMessage('Select project, user, and role first');
+      return;
+    }
+
+    try {
+      setLoading(true);
+      setMessage('');
+
+      await usersApi.assignToProject(Number(projectForm.projectId), {
+        userId: Number(projectForm.userId),
+        roleId: Number(projectForm.roleId),
+        status: projectForm.status as 'ACTIVE' | 'INACTIVE',
+      });
+
+      setMessage('User assigned to project successfully');
+      setProjectForm({ projectId: '', userId: '', roleId: '', status: 'ACTIVE' });
+
+      await loadData();
+    } catch (error: any) {
+      setMessage(error.response?.data?.message || 'Failed to assign user to project');
     } finally {
       setLoading(false);
     }
@@ -292,9 +340,7 @@ await loadData();
               <Input
                 label="Full Name"
                 value={editForm.name}
-                onChange={(e) =>
-                  setEditForm({ ...editForm, name: e.target.value })
-                }
+                onChange={(e) => setEditForm({ ...editForm, name: e.target.value })}
                 required
               />
 
@@ -302,34 +348,26 @@ await loadData();
                 label="Email"
                 type="email"
                 value={editForm.email}
-                onChange={(e) =>
-                  setEditForm({ ...editForm, email: e.target.value })
-                }
+                onChange={(e) => setEditForm({ ...editForm, email: e.target.value })}
                 required
               />
 
               <Input
                 label="Phone"
                 value={editForm.phone}
-                onChange={(e) =>
-                  setEditForm({ ...editForm, phone: e.target.value })
-                }
+                onChange={(e) => setEditForm({ ...editForm, phone: e.target.value })}
               />
 
               <Input
                 label="Job Title"
                 value={editForm.jobTitle}
-                onChange={(e) =>
-                  setEditForm({ ...editForm, jobTitle: e.target.value })
-                }
+                onChange={(e) => setEditForm({ ...editForm, jobTitle: e.target.value })}
               />
 
               <SelectField
                 label="User Status"
                 value={editForm.status}
-                onChange={(value) =>
-                  setEditForm({ ...editForm, status: value })
-                }
+                onChange={(value) => setEditForm({ ...editForm, status: value })}
               >
                 <option value="ACTIVE">Active</option>
                 <option value="INACTIVE">Inactive</option>
@@ -358,174 +396,175 @@ await loadData();
       <div className="module-grid" style={{ marginTop: 20 }}>
         <div className="module-sidebar">
           <PermissionGuard permissions={['users:create']}>
-  <Card title="Create Employee User">
-    <form onSubmit={handleCreateUser}>
-      <Input
-        label="Full Name"
-        value={createForm.name}
-        onChange={(e) => setCreateForm({ ...createForm, name: e.target.value })}
-        required
-      />
+            <Card title="Create Employee User">
+              <form onSubmit={handleCreateUser}>
+                <Input
+                  label="Full Name"
+                  value={createForm.name}
+                  onChange={(e) => setCreateForm({ ...createForm, name: e.target.value })}
+                  required
+                />
 
-      <Input
-        label="Email"
-        type="email"
-        value={createForm.email}
-        onChange={(e) => setCreateForm({ ...createForm, email: e.target.value })}
-        required
-      />
+                <Input
+                  label="Email"
+                  type="email"
+                  value={createForm.email}
+                  onChange={(e) => setCreateForm({ ...createForm, email: e.target.value })}
+                  required
+                />
 
-      <Input
-        label="Temporary Password"
-        type="password"
-        value={createForm.password}
-        onChange={(e) =>
-          setCreateForm({ ...createForm, password: e.target.value })
-        }
-        required
-      />
+                <Input
+                  label="Temporary Password"
+                  type="password"
+                  value={createForm.password}
+                  onChange={(e) =>
+                    setCreateForm({ ...createForm, password: e.target.value })
+                  }
+                  required
+                />
 
-      <Input
-        label="Employee ID"
-        value={createForm.employeeId}
-        onChange={(e) =>
-          setCreateForm({ ...createForm, employeeId: e.target.value })
-        }
-      />
+                <Input
+                  label="Employee ID"
+                  value={createForm.employeeId}
+                  onChange={(e) =>
+                    setCreateForm({ ...createForm, employeeId: e.target.value })
+                  }
+                />
 
-      <Input
-        label="Phone"
-        value={createForm.phone}
-        onChange={(e) => setCreateForm({ ...createForm, phone: e.target.value })}
-      />
+                <Input
+                  label="Phone"
+                  value={createForm.phone}
+                  onChange={(e) => setCreateForm({ ...createForm, phone: e.target.value })}
+                />
 
-      <Input
-        label="Job Title"
-        value={createForm.jobTitle}
-        onChange={(e) =>
-          setCreateForm({ ...createForm, jobTitle: e.target.value })
-        }
-      />
+                <Input
+                  label="Job Title"
+                  value={createForm.jobTitle}
+                  onChange={(e) =>
+                    setCreateForm({ ...createForm, jobTitle: e.target.value })
+                  }
+                />
 
-      <Input
-        label="Department"
-        value={createForm.department}
-        onChange={(e) =>
-          setCreateForm({ ...createForm, department: e.target.value })
-        }
-      />
+                <Input
+                  label="Department"
+                  value={createForm.department}
+                  onChange={(e) =>
+                    setCreateForm({ ...createForm, department: e.target.value })
+                  }
+                />
 
-      <SelectField
-        label="Employment Type"
-        value={createForm.employmentType}
-        onChange={(value) =>
-          setCreateForm({ ...createForm, employmentType: value })
-        }
-      >
-        <option value="FULL_TIME">Full Time</option>
-        <option value="PART_TIME">Part Time</option>
-        <option value="CONTRACT">Contract</option>
-        <option value="INTERN">Intern</option>
-      </SelectField>
+                <SelectField
+                  label="Employment Type"
+                  value={createForm.employmentType}
+                  onChange={(value) =>
+                    setCreateForm({ ...createForm, employmentType: value })
+                  }
+                >
+                  <option value="FULL_TIME">Full Time</option>
+                  <option value="PART_TIME">Part Time</option>
+                  <option value="CONTRACT">Contract</option>
+                  <option value="INTERN">Intern</option>
+                </SelectField>
 
-      <SelectField
-        label="Gender"
-        value={createForm.gender}
-        onChange={(value) => setCreateForm({ ...createForm, gender: value })}
-      >
-        <option value="">Select gender</option>
-        <option value="MALE">Male</option>
-        <option value="FEMALE">Female</option>
-      </SelectField>
+                <SelectField
+                  label="Gender"
+                  value={createForm.gender}
+                  onChange={(value) => setCreateForm({ ...createForm, gender: value })}
+                >
+                  <option value="">Select gender</option>
+                  <option value="MALE">Male</option>
+                  <option value="FEMALE">Female</option>
+                </SelectField>
 
-      <Input
-        label="Nationality"
-        value={createForm.nationality}
-        onChange={(e) =>
-          setCreateForm({ ...createForm, nationality: e.target.value })
-        }
-      />
+                <Input
+                  label="Nationality"
+                  value={createForm.nationality}
+                  onChange={(e) =>
+                    setCreateForm({ ...createForm, nationality: e.target.value })
+                  }
+                />
 
-      <Input
-        label="Address"
-        value={createForm.address}
-        onChange={(e) =>
-          setCreateForm({ ...createForm, address: e.target.value })
-        }
-      />
+                <Input
+                  label="Address"
+                  value={createForm.address}
+                  onChange={(e) =>
+                    setCreateForm({ ...createForm, address: e.target.value })
+                  }
+                />
 
-      <Input
-        label="Emergency Contact Name"
-        value={createForm.emergencyName}
-        onChange={(e) =>
-          setCreateForm({ ...createForm, emergencyName: e.target.value })
-        }
-      />
+                <Input
+                  label="Emergency Contact Name"
+                  value={createForm.emergencyName}
+                  onChange={(e) =>
+                    setCreateForm({ ...createForm, emergencyName: e.target.value })
+                  }
+                />
 
-      <Input
-        label="Emergency Contact Phone"
-        value={createForm.emergencyPhone}
-        onChange={(e) =>
-          setCreateForm({ ...createForm, emergencyPhone: e.target.value })
-        }
-      />
+                <Input
+                  label="Emergency Contact Phone"
+                  value={createForm.emergencyPhone}
+                  onChange={(e) =>
+                    setCreateForm({ ...createForm, emergencyPhone: e.target.value })
+                  }
+                />
 
-      <Input
-        label="Education Level"
-        value={createForm.educationLevel}
-        onChange={(e) =>
-          setCreateForm({ ...createForm, educationLevel: e.target.value })
-        }
-      />
+                <Input
+                  label="Education Level"
+                  value={createForm.educationLevel}
+                  onChange={(e) =>
+                    setCreateForm({ ...createForm, educationLevel: e.target.value })
+                  }
+                />
 
-      <Input
-        label="Field of Study"
-        value={createForm.fieldOfStudy}
-        onChange={(e) =>
-          setCreateForm({ ...createForm, fieldOfStudy: e.target.value })
-        }
-      />
+                <Input
+                  label="Field of Study"
+                  value={createForm.fieldOfStudy}
+                  onChange={(e) =>
+                    setCreateForm({ ...createForm, fieldOfStudy: e.target.value })
+                  }
+                />
 
-      <Input
-        label="Institution"
-        value={createForm.institution}
-        onChange={(e) =>
-          setCreateForm({ ...createForm, institution: e.target.value })
-        }
-      />
+                <Input
+                  label="Institution"
+                  value={createForm.institution}
+                  onChange={(e) =>
+                    setCreateForm({ ...createForm, institution: e.target.value })
+                  }
+                />
 
-      <Input
-        label="Graduation Year"
-        type="number"
-        value={createForm.graduationYear}
-        onChange={(e) =>
-          setCreateForm({ ...createForm, graduationYear: e.target.value })
-        }
-      />
+                <Input
+                  label="Graduation Year"
+                  type="number"
+                  value={createForm.graduationYear}
+                  onChange={(e) =>
+                    setCreateForm({ ...createForm, graduationYear: e.target.value })
+                  }
+                />
 
-      <Input
-        label="Years of Experience"
-        type="number"
-        value={createForm.yearsExperience}
-        onChange={(e) =>
-          setCreateForm({ ...createForm, yearsExperience: e.target.value })
-        }
-      />
+                <Input
+                  label="Years of Experience"
+                  type="number"
+                  value={createForm.yearsExperience}
+                  onChange={(e) =>
+                    setCreateForm({ ...createForm, yearsExperience: e.target.value })
+                  }
+                />
 
-      <Input
-        label="Previous Company"
-        value={createForm.previousCompany}
-        onChange={(e) =>
-          setCreateForm({ ...createForm, previousCompany: e.target.value })
-        }
-      />
+                <Input
+                  label="Previous Company"
+                  value={createForm.previousCompany}
+                  onChange={(e) =>
+                    setCreateForm({ ...createForm, previousCompany: e.target.value })
+                  }
+                />
 
-      <Button type="submit" disabled={loading} style={{ width: '100%' }}>
-        {loading ? 'Creating...' : 'Create Employee User'}
-      </Button>
-    </form>
-  </Card>
-</PermissionGuard>
+                <Button type="submit" disabled={loading} style={{ width: '100%' }}>
+                  {loading ? 'Creating...' : 'Create Employee User'}
+                </Button>
+              </form>
+            </Card>
+          </PermissionGuard>
+
           <Card title="Assign User to Company">
             <form onSubmit={assignCompanyUser}>
               <SelectField
@@ -580,9 +619,6 @@ await loadData();
               </PermissionGuard>
             </form>
           </Card>
-
-
-
 
           <Card title="Assign User to Project">
             <form onSubmit={assignProjectUser}>
@@ -653,7 +689,7 @@ await loadData();
                 {
                   header: 'Actions',
                   accessor: (row) => (
-                    <div style={{ display: 'flex', gap: 8 }}>
+                    <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
                       <PermissionGuard permissions={['users:update']}>
                         <Button
                           variant="secondary"
@@ -664,15 +700,38 @@ await loadData();
                         </Button>
                       </PermissionGuard>
 
-                      <PermissionGuard permissions={['users:delete']}>
-                        <Button
-                          variant="danger"
-                          onClick={() => handleDelete(row.id)}
-                          style={{ padding: '6px 10px' }}
-                        >
-                          Deactivate
-                        </Button>
-                      </PermissionGuard>
+                      {row.status === 'ACTIVE' ? (
+                        <PermissionGuard permissions={['users:delete']}>
+                          <Button
+                            variant="danger"
+                            onClick={() => handleDeactivate(row.id)}
+                            style={{ padding: '6px 10px' }}
+                          >
+                            Deactivate
+                          </Button>
+                        </PermissionGuard>
+                      ) : (
+                        <>
+                          <PermissionGuard permissions={['users:update']}>
+                            <Button
+                              onClick={() => handleActivate(row.id)}
+                              style={{ padding: '6px 10px' }}
+                            >
+                              Activate
+                            </Button>
+                          </PermissionGuard>
+
+                          <PermissionGuard permissions={['users:delete']}>
+                            <Button
+                              variant="danger"
+                              onClick={() => handlePermanentDelete(row.id)}
+                              style={{ padding: '6px 10px' }}
+                            >
+                              Delete
+                            </Button>
+                          </PermissionGuard>
+                        </>
+                      )}
                     </div>
                   ),
                 },

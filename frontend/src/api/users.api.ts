@@ -1,13 +1,16 @@
 import { api } from './client';
 
+export type UserStatus = 'ACTIVE' | 'INACTIVE';
+
 export type User = {
   id: number;
   name: string;
   email: string;
   phone?: string | null;
   jobTitle?: string | null;
-  status: string;
+  status: UserStatus;
 };
+
 export type CreateUserPayload = {
   name: string;
   email: string;
@@ -29,24 +32,25 @@ export type CreateUserPayload = {
   yearsExperience?: number;
   previousCompany?: string;
 };
+
 export type UpdateUserPayload = {
   name?: string;
   email?: string;
   phone?: string;
   jobTitle?: string;
-  status?: string;
+  status?: UserStatus;
 };
 
 export type AssignCompanyUserPayload = {
   userId: number;
   roleId: number;
-  status?: 'ACTIVE' | 'INACTIVE';
+  status?: UserStatus;
 };
 
 export type AssignProjectUserPayload = {
   userId: number;
   roleId: number;
-  status?: 'ACTIVE' | 'INACTIVE';
+  status?: UserStatus;
 };
 
 export const usersApi = {
@@ -55,15 +59,33 @@ export const usersApi = {
     return response.data;
   },
 
-update: async (id: number, data: UpdateUserPayload): Promise<User> => {
-  const response = await api.patch(`/users/${id}`, data);
-  return response.data;
-},
+  create: async (data: CreateUserPayload): Promise<User> => {
+    const response = await api.post('/users', data);
+    return response.data;
+  },
 
- remove: async (id: number) => {
-  const response = await api.delete(`/users/${id}`);
-  return response.data;
-},
+  update: async (id: number, data: UpdateUserPayload): Promise<User> => {
+    const response = await api.patch(`/users/${id}`, data);
+    return response.data;
+  },
+
+  remove: async (id: number): Promise<User> => {
+    const response = await api.delete(`/users/${id}`);
+    return response.data;
+  },
+
+  activate: async (id: number): Promise<User> => {
+    const response = await api.patch(`/users/${id}`, {
+      status: 'ACTIVE',
+    });
+
+    return response.data;
+  },
+
+  permanentDelete: async (id: number): Promise<User> => {
+    const response = await api.delete(`/users/${id}/permanent`);
+    return response.data;
+  },
 
   assignToCompany: async (
     companyId: number,
@@ -80,9 +102,4 @@ update: async (id: number, data: UpdateUserPayload): Promise<User> => {
     const response = await api.post(`/projects/${projectId}/users`, data);
     return response.data;
   },
-
-  create: async (data: CreateUserPayload): Promise<User> => {
-  const response = await api.post('/users', data);
-  return response.data;
-},
 };
