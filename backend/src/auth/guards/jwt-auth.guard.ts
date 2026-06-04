@@ -4,7 +4,7 @@ import {
   Injectable,
   UnauthorizedException,
 } from '@nestjs/common';
-import { JwtService } from '@nestjs/jwt';
+import { JwtService, TokenExpiredError } from '@nestjs/jwt';
 import { Request } from 'express';
 
 @Injectable()
@@ -13,11 +13,13 @@ export class JwtAuthGuard implements CanActivate {
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
     const request = context.switchToHttp().getRequest<Request>();
-
     const authHeader = request.headers.authorization;
 
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      throw new UnauthorizedException('Missing access token');
+    if (!authHeader?.startsWith('Bearer ')) {
+      throw new UnauthorizedException({
+        code: 'AUTH_TOKEN_MISSING',
+        message: 'Authentication required',
+      });
     }
 
     const token = authHeader.split(' ')[1];
@@ -28,10 +30,19 @@ export class JwtAuthGuard implements CanActivate {
       });
 
       request['user'] = payload;
-
       return true;
-    } catch {
-      throw new UnauthorizedException('Invalid or expired token');
+    } catch (error) {
+      if (error instanceof TokenExpiredError) {
+        throw new UnauthorizedException({
+          code: 'AUTH_TOKEN_EXPIRED',
+          message: 'Session expired. Please sign in again.',
+        });
+      }
+
+      throw new UnauthorizedException({
+        code: 'AUTH_TOKEN_INVALID',
+        message: 'Invalid authentication token',
+      });
     }
   }
 }
