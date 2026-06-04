@@ -56,7 +56,24 @@ export default function CompaniesPage() {
       [name]: value,
     }));
   }
+const currencies = [
+  { value: 'USD', label: 'USD - US Dollar' },
+  { value: 'ETB', label: 'ETB - Ethiopian Birr' },
+];
 
+const timezones = [
+  'UTC',
+  'Africa/Addis_Ababa',
+  'Africa/Nairobi',
+  'Europe/London',
+  'Europe/Paris',
+  'America/New_York',
+  'America/Chicago',
+  'America/Los_Angeles',
+  'Asia/Dubai',
+  'Asia/Kolkata',
+  'Asia/Tokyo',
+];
   function handleEdit(company: Company) {
     setEditingCompany(company);
 
@@ -202,17 +219,35 @@ export default function CompaniesPage() {
                 onChange={(e) => updateField('taxNumber', e.target.value)}
               />
 
-              <Input
-                label="Currency"
-                value={form.currency}
-                onChange={(e) => updateField('currency', e.target.value)}
-              />
+<div className="form-group">
+  <label className="form-label">Currency</label>
+  <select
+    value={form.currency}
+    onChange={(e) => updateField('currency', e.target.value)}
+    className="form-select"
+  >
+    {currencies.map((currency) => (
+      <option key={currency.value} value={currency.value}>
+        {currency.label}
+      </option>
+    ))}
+  </select>
+</div>
 
-              <Input
-                label="Timezone"
-                value={form.timezone}
-                onChange={(e) => updateField('timezone', e.target.value)}
-              />
+<div className="form-group">
+  <label className="form-label">Timezone</label>
+  <select
+    value={form.timezone}
+    onChange={(e) => updateField('timezone', e.target.value)}
+    className="form-select"
+  >
+    {timezones.map((timezone) => (
+      <option key={timezone} value={timezone}>
+        {timezone}
+      </option>
+    ))}
+  </select>
+</div>
 
               <Input
                 label="Language"

@@ -14,14 +14,16 @@ export type LoginPayload = {
 };
 
 export type LoginResponse = {
+  message: string;
   accessToken: string;
-};
-
-export type AuthUser = {
-  sub: number;
-  email: string;
-  name?: string;
-  role?: string;
+  user: {
+    id: number;
+    name: string;
+    email: string;
+    phone?: string | null;
+    jobTitle?: string | null;
+    status: string;
+  };
 };
 
 export type AuthCompany = {
@@ -51,18 +53,13 @@ export type AuthMe = {
 };
 
 export const authApi = {
-  register: async (data: RegisterPayload) => {
+  register: async (data: RegisterPayload): Promise<LoginResponse> => {
     const response = await api.post('/auth/register', data);
     return response.data;
   },
 
   login: async (data: LoginPayload): Promise<LoginResponse> => {
     const response = await api.post('/auth/login', data);
-    return response.data;
-  },
-
-  getProfile: async (): Promise<AuthUser> => {
-    const response = await api.get('/auth/profile');
     return response.data;
   },
 

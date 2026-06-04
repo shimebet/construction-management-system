@@ -1,15 +1,22 @@
-import { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { useEffect, useState } from 'react';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { authApi } from '../../api/auth.api';
 import { Button, Input } from '../../components/ui';
 
 export default function LoginPage() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
 
   const [email, setEmail] = useState('admin@buildpro.com');
   const [password, setPassword] = useState('123456');
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState('');
+
+  useEffect(() => {
+    if (searchParams.get('session') === 'expired') {
+      setMessage('Your session has expired. Please sign in again.');
+    }
+  }, [searchParams]);
 
   async function handleLogin(e: React.FormEvent) {
     e.preventDefault();
