@@ -1,24 +1,22 @@
-import { IsNumber, IsOptional, IsString } from 'class-validator';
+import { IsInt, IsNotEmpty, IsOptional, IsString } from 'class-validator';
 
 export class CreateWbsItemDto {
-  @IsNumber()
-  projectId!: number;
+  @IsInt()
+  projectId: number;
 
   @IsOptional()
-  @IsNumber()
-  parentId?: number;
+  @IsInt()
+  parentId?: number | null;
 
   @IsString()
-  code!: string;
-
-  @IsString()
-  name!: string;
+  @IsNotEmpty()
+  name: string;
 
   @IsOptional()
   @IsString()
   description?: string;
 
   @IsOptional()
-  @IsNumber()
+  @IsInt()
   sortOrder?: number;
 }

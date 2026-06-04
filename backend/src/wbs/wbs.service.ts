@@ -35,11 +35,13 @@ export class WbsService {
       }
     }
 
+    const code = await this.generateWbsCode(dto.projectId, dto.parentId ?? null);
+
     const wbsItem = await this.prisma.wbsItem.create({
       data: {
         projectId: dto.projectId,
         parentId: dto.parentId ?? null,
-        code: dto.code,
+        code,
         name: dto.name,
         description: dto.description ?? null,
         sortOrder: dto.sortOrder ?? 0,
@@ -66,6 +68,7 @@ export class WbsService {
     return this.prisma.wbsItem.findMany({
       where: {
         projectId,
+        isActive: true,
       },
       include: this.wbsInclude(),
       orderBy: [{ sortOrder: 'asc' }, { code: 'asc' }],
@@ -118,7 +121,6 @@ export class WbsService {
       data: {
         projectId: dto.projectId,
         parentId: dto.parentId,
-        code: dto.code,
         name: dto.name,
         description: dto.description,
         sortOrder: dto.sortOrder,
@@ -167,30 +169,36 @@ export class WbsService {
     return deactivated;
   }
 
-  async activate(id: number, userId?: number) {
-    const oldWbsItem = await this.findOne(id);
+  private async generateWbsCode(projectId: number, parentId: number | null) {
+    if (!parentId) {
+      const rootCount = await this.prisma.wbsItem.count({
+        where: {
+          projectId,
+          parentId: null,
+        },
+      });
 
-    const activated = await this.prisma.wbsItem.update({
-      where: { id },
-      data: {
-        isActive: true,
+      return `${rootCount + 1}.0`;
+    }
+
+    const parent = await this.prisma.wbsItem.findUnique({
+      where: { id: parentId },
+    });
+
+    if (!parent) {
+      throw new BadRequestException('Invalid parent WBS item');
+    }
+
+    const childCount = await this.prisma.wbsItem.count({
+      where: {
+        projectId,
+        parentId,
       },
-      include: this.wbsInclude(),
     });
 
-    await this.auditService.create({
-      userId,
-      projectId: oldWbsItem.projectId,
-      action: AuditAction.UPDATE,
-      module: 'wbs',
-      entityName: 'WbsItem',
-      entityId: String(id),
-      description: `Activated WBS item ${oldWbsItem.code} - ${oldWbsItem.name}`,
-      oldData: oldWbsItem,
-      newData: activated,
-    });
+    const parentPrefix = parent.code.split('.')[0];
 
-    return activated;
+    return `${parentPrefix}.${childCount + 1}`;
   }
 
   private wbsInclude() {
