@@ -15,7 +15,6 @@ export type WbsItem = {
 export type CreateWbsPayload = {
   projectId: number;
   parentId?: number | null;
-  code: string;
   name: string;
   description?: string;
   sortOrder?: number;
@@ -34,10 +33,7 @@ export const wbsApi = {
     return response.data;
   },
 
-  update: async (
-    id: number,
-    data: UpdateWbsPayload,
-  ): Promise<WbsItem> => {
+  update: async (id: number, data: UpdateWbsPayload): Promise<WbsItem> => {
     const response = await api.patch(`/wbs/${id}`, data);
     return response.data;
   },

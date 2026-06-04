@@ -9,7 +9,6 @@ import { Button, Card, DataTable, Input, PageHeader } from '../../components/ui'
 const emptyForm: CreateWbsPayload = {
   projectId: 0,
   parentId: null,
-  code: '',
   name: '',
   description: '',
   sortOrder: 0,
@@ -99,7 +98,6 @@ export default function WbsPage() {
     setForm({
       projectId: item.projectId,
       parentId: item.parentId ?? null,
-      code: item.code,
       name: item.name,
       description: item.description || '',
       sortOrder: item.sortOrder ?? 0,
@@ -128,15 +126,13 @@ export default function WbsPage() {
     try {
       setLoading(true);
       setMessage('');
-
-      const payload: CreateWbsPayload = {
-        projectId: Number(form.projectId),
-        parentId: form.parentId ? Number(form.parentId) : null,
-        code: form.code,
-        name: form.name,
-        description: form.description || '',
-        sortOrder: Number(form.sortOrder ?? 0),
-      };
+const payload: CreateWbsPayload = {
+  projectId: Number(form.projectId),
+  parentId: form.parentId ? Number(form.parentId) : null,
+  name: form.name,
+  description: form.description || '',
+  sortOrder: Number(form.sortOrder ?? 0),
+};
 
       if (editingWbs) {
         await wbsApi.update(editingWbs.id, payload);
@@ -248,12 +244,24 @@ export default function WbsPage() {
                 ))}
               </SelectField>
 
-              <Input
-                label="WBS Code"
-                value={form.code}
-                onChange={(e) => updateField('code', e.target.value)}
-                required
-              />
+<div
+  style={{
+    marginBottom: 12,
+    padding: 12,
+    borderRadius: 8,
+    background: '#f8fafc',
+    border: '1px solid #e5e7eb',
+    color: '#475569',
+    fontSize: 14,
+  }}
+>
+  WBS code will be generated automatically by the system.
+  {editingWbs && (
+    <strong style={{ display: 'block', marginTop: 4, color: '#111827' }}>
+      Current Code: {editingWbs.code}
+    </strong>
+  )}
+</div>
 
               <Input
                 label="WBS Name"
