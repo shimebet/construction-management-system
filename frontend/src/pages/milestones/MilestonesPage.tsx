@@ -13,7 +13,6 @@ import { Button, Card, DataTable, Input, PageHeader } from '../../components/ui'
 
 const emptyForm: CreateMilestonePayload = {
   projectId: 0,
-  code: '',
   name: '',
   description: '',
   plannedDate: '',
@@ -92,21 +91,20 @@ export default function MilestonesPage() {
     }
   }
 
-  function handleEdit(milestone: Milestone) {
-    setEditingMilestone(milestone);
+function handleEdit(milestone: Milestone) {
+  setEditingMilestone(milestone);
 
-    setForm({
-      projectId: milestone.projectId,
-      code: milestone.code,
-      name: milestone.name,
-      description: milestone.description || '',
-      plannedDate: milestone.plannedDate?.slice(0, 10) || '',
-      actualDate: milestone.actualDate?.slice(0, 10) || '',
-      status: milestone.status || 'PLANNED',
-    });
+  setForm({
+    projectId: milestone.projectId,
+    name: milestone.name,
+    description: milestone.description || '',
+    plannedDate: milestone.plannedDate?.slice(0, 10) || '',
+    actualDate: milestone.actualDate?.slice(0, 10) || '',
+    status: milestone.status || 'PLANNED',
+  });
 
-    setMessage('');
-  }
+  setMessage('');
+}
 
   function cancelEdit() {
     setEditingMilestone(null);
@@ -254,12 +252,24 @@ export default function MilestonesPage() {
                 ))}
               </SelectField>
 
-              <Input
-                label="Milestone Code"
-                value={form.code}
-                onChange={(e) => updateField('code', e.target.value)}
-                required
-              />
+<div
+  style={{
+    marginBottom: 12,
+    padding: 12,
+    borderRadius: 8,
+    background: '#f8fafc',
+    border: '1px solid #e5e7eb',
+    color: '#475569',
+    fontSize: 14,
+  }}
+>
+  Milestone code will be generated automatically by the system.
+  {editingMilestone && (
+    <strong style={{ display: 'block', marginTop: 4, color: '#111827' }}>
+      Current Code: {editingMilestone.code}
+    </strong>
+  )}
+</div>
 
               <Input
                 label="Milestone Name"

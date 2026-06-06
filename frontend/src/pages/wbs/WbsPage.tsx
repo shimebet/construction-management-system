@@ -27,7 +27,7 @@ export default function WbsPage() {
 
   useEffect(() => {
     loadInitialData();
-  }, []);
+  }, []); 
 
   async function loadInitialData() {
     try {

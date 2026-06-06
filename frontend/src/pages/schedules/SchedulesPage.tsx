@@ -37,7 +37,6 @@ type SortDirection = 'asc' | 'desc';
 const emptyForm: BaselineForm = {
   projectId: 0,
   name: '',
-  version: '',
   description: '',
   plannedStartDate: '',
   plannedFinishDate: '',
@@ -107,7 +106,9 @@ export default function SchedulesPage() {
       })
       .sort((a, b) => compareBaseline(a, b, sortKey, sortDirection));
   }, [baselines, search, statusFilter, activeFilter, sortKey, sortDirection]);
-
+  const [statusModalBaseline, setStatusModalBaseline] =
+    useState<ScheduleBaseline | null>(null);
+  const [statusModalValue, setStatusModalValue] = useState('');
   async function loadProjects() {
     try {
       setLoading(true);
@@ -125,20 +126,52 @@ export default function SchedulesPage() {
       setLoading(false);
     }
   }
+  async function handleConfirmStatusChange() {
+    if (!statusModalBaseline) return;
 
-async function handleUnlock(id: number) {
-  const confirmed = window.confirm(
-    'Create revision from this approved baseline?',
-  );
+    const normalizedStatus = statusModalValue.trim().toUpperCase();
 
-  if (!confirmed) return;
+    if (normalizedStatus === statusModalBaseline.status) {
+      setStatusModalBaseline(null);
+      return;
+    }
 
-  await runBaselineAction(
-    () => schedulesApi.unlockBaseline(id),
-    'Revision baseline created successfully',
-    'Failed to create revision baseline',
-  );
-}
+    setStatusModalBaseline(null);
+
+    if (normalizedStatus === 'PENDING_APPROVAL') {
+      return handleSubmitForApproval(statusModalBaseline.id);
+    }
+
+    if (normalizedStatus === 'APPROVED') {
+      return handleApprove(statusModalBaseline.id);
+    }
+
+    if (normalizedStatus === 'REJECTED') {
+      return handleReject(statusModalBaseline.id);
+    }
+
+    if (normalizedStatus === 'SUPERSEDED') {
+      return handleDeactivate(statusModalBaseline.id);
+    }
+
+    if (normalizedStatus === 'DRAFT') {
+      return handleActivate(statusModalBaseline.id);
+    }
+  }
+
+  async function handleUnlock(id: number) {
+    const confirmed = window.confirm(
+      'Create revision from this approved baseline?',
+    );
+
+    if (!confirmed) return;
+
+    await runBaselineAction(
+      () => schedulesApi.unlockBaseline(id),
+      'Revision baseline created successfully',
+      'Failed to create revision baseline',
+    );
+  }
   async function loadBaselines(projectId: number) {
     try {
       setLoading(true);
@@ -215,12 +248,8 @@ async function handleUnlock(id: number) {
   function validateForm() {
     if (!form.projectId) return 'Select project first';
     if (!form.name.trim()) return 'Baseline name is required';
-    if (!form.version.trim()) return 'Version is required';
 
-    const baselineVersionRegex = new RegExp('^BL-[0-9]{3,}$', 'i');
-    if (!baselineVersionRegex.test(form.version.trim())) {
-      return 'Version must follow international baseline format, for example BL-001';
-    }
+
 
     if (form.plannedStartDate && form.plannedFinishDate) {
       if (new Date(form.plannedStartDate) > new Date(form.plannedFinishDate)) {
@@ -247,7 +276,6 @@ async function handleUnlock(id: number) {
       const payload: CreateBaselinePayload = {
         projectId: Number(form.projectId),
         name: form.name.trim(),
-        version: form.version.trim().toUpperCase(),
         description: form.description?.trim() || '',
       };
 
@@ -340,29 +368,9 @@ async function handleUnlock(id: number) {
     );
   }
 
-  async function handleEditStatus(baseline: ScheduleBaseline) {
-    const currentStatus = String(baseline.status || 'DRAFT');
-    const nextStatus = window.prompt(
-      'Enter new status: DRAFT, PENDING_APPROVAL, APPROVED, REJECTED, or SUPERSEDED',
-      currentStatus,
-    );
-
-    if (!nextStatus) return;
-
-    const normalizedStatus = nextStatus.trim().toUpperCase();
-
-    if (!allowedStatuses.includes(normalizedStatus)) {
-      setMessage('Invalid status. Use DRAFT, PENDING_APPROVAL, APPROVED, REJECTED, or SUPERSEDED.');
-      return;
-    }
-
-    if (normalizedStatus === currentStatus) return;
-
-    if (normalizedStatus === 'PENDING_APPROVAL') return handleSubmitForApproval(baseline.id);
-    if (normalizedStatus === 'APPROVED') return handleApprove(baseline.id);
-    if (normalizedStatus === 'REJECTED') return handleReject(baseline.id);
-    if (normalizedStatus === 'SUPERSEDED') return handleDeactivate(baseline.id);
-    if (normalizedStatus === 'DRAFT') return handleActivate(baseline.id);
+  function handleEditStatus(baseline: ScheduleBaseline) {
+    setStatusModalBaseline(baseline);
+    setStatusModalValue(String(baseline.status || 'DRAFT'));
   }
 
   async function runBaselineAction(action: () => Promise<any>, successMessage: string, fallbackError: string) {
@@ -429,13 +437,13 @@ async function handleUnlock(id: number) {
                 required
               />
 
-              <Input
+              {/* <Input
                 label="Version"
                 placeholder="BL-001"
                 value={form.version}
                 onChange={(e) => updateField('version', e.target.value)}
                 required
-              />
+              /> */}
 
               <Input
                 label="Planned Start Date"
@@ -508,46 +516,92 @@ async function handleUnlock(id: number) {
 
           {loading && <p>Loading...</p>}
 
-          <DataTable<ScheduleBaseline>
-            columns={[
-              { header: 'Version', accessor: 'version' },
-              { header: 'Name', accessor: 'name' },
-              { header: 'Status', accessor: (row) => <StatusBadge status={row.status as BaselineStatus} /> },
-              { header: 'Active', accessor: (row) => (row.isActive ? 'Yes' : 'No') },
-              { header: 'Tasks', accessor: (row) => row.items?.length ?? 0 },
-              { header: 'Start', accessor: () => '-' },
-              { header: 'Finish', accessor: () => '-' },
-              { header: 'Approved At', accessor: (row) => formatDate(row.approvedAt) },
-              { header: 'Created', accessor: (row) => formatDate(row.createdAt) },
-              {
-                header: 'Actions',
-                accessor: (row) => (
-<BaselineActions
-  baseline={row}
-  onView={handleView}
-  onEdit={handleEdit}
-  onLocked={handleLocked}
+<DataTable<ScheduleBaseline>
+  columns={[
+    { header: 'Version', accessor: 'version' },
+    { header: 'Name', accessor: 'name' },
+    { header: 'Status', accessor: (row) => <StatusBadge status={row.status as BaselineStatus} /> },
 
-  onUnlock={handleUnlock}
+    {
+      header: 'Rejection Reason',
+      accessor: (row) =>
+        row.status === 'REJECTED'
+          ? row.rejectionReason || '-'
+          : '-',
+    },
 
-  onEditStatus={handleEditStatus}
-  onSubmitForApproval={handleSubmitForApproval}
-  onApprove={handleApprove}
-  onReject={handleReject}
-  onActivate={handleActivate}
-  onDeactivate={handleDeactivate}
-  onDelete={handleDelete}
+    { header: 'Active', accessor: (row) => (row.isActive ? 'Yes' : 'No') },
+    { header: 'Tasks', accessor: (row) => row.items?.length ?? 0 },
+    { header: 'Start', accessor: () => '-' },
+    { header: 'Finish', accessor: () => '-' },
+    { header: 'Approved At', accessor: (row) => formatDate(row.approvedAt) },
+    { header: 'Created', accessor: (row) => formatDate(row.createdAt) },
+    {
+      header: 'Actions',
+      accessor: (row) => (
+        <BaselineActions
+          baseline={row}
+          onView={handleView}
+          onEdit={handleEdit}
+          onLocked={handleLocked}
+          onUnlock={handleUnlock}
+          onEditStatus={handleEditStatus}
+          onSubmitForApproval={handleSubmitForApproval}
+          onApprove={handleApprove}
+          onReject={handleReject}
+          onActivate={handleActivate}
+          onDeactivate={handleDeactivate}
+          onDelete={handleDelete}
+        />
+      ),
+    },
+  ]}
+  data={filteredBaselines}
+  emptyMessage="No schedule baselines found"
 />
-                ),
-              },
-            ]}
-            data={filteredBaselines}
-            emptyMessage="No schedule baselines found"
-          />
         </Card>
       </div>
 
       {viewingBaseline && <BaselineDetailsModal baseline={viewingBaseline} onClose={() => setViewingBaseline(null)} />}
+      {statusModalBaseline && (
+        <div style={modalOverlayStyle} role="dialog" aria-modal="true">
+          <div style={{ ...modalStyle, width: 'min(460px, 100%)' }}>
+            <h2 style={{ marginTop: 0 }}>Change Baseline Status</h2>
+
+            <p style={{ color: '#64748b' }}>
+              Select the next workflow status for{' '}
+              <strong>{statusModalBaseline.version}</strong>.
+            </p>
+
+            <SelectField
+              label="Status"
+              value={statusModalValue}
+              onChange={setStatusModalValue}
+              required
+            >
+              <option value="DRAFT">Draft</option>
+              <option value="PENDING_APPROVAL">Pending Approval</option>
+              <option value="APPROVED">Approved</option>
+              <option value="REJECTED">Rejected</option>
+              <option value="SUPERSEDED">Superseded</option>
+            </SelectField>
+
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10 }}>
+              <Button
+                type="button"
+                variant="secondary"
+                onClick={() => setStatusModalBaseline(null)}
+              >
+                Cancel
+              </Button>
+
+              <Button type="button" onClick={handleConfirmStatusChange}>
+                Update Status
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -587,75 +641,75 @@ function BaselineActions({
   const isApproved = status === 'APPROVED';
   const isPending = status === 'PENDING_APPROVAL';
   const isDraft = status === 'DRAFT' || status === 'REJECTED';
-const iconButtonStyle: React.CSSProperties = {
-  width: 34,
-  height: 34,
-  padding: 0,
-  display: 'flex',
-  alignItems: 'center',
-  justifyContent: 'center',
-  borderRadius: 8,
-};
+  const iconButtonStyle: React.CSSProperties = {
+    width: 34,
+    height: 34,
+    padding: 0,
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 8,
+  };
 
   return (
     <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
-<Button
-  type="button"
-  variant="secondary"
-  onClick={() => onView(baseline)}
-  style={iconButtonStyle}
-  title="View Baseline"
->
-  <Eye size={16} />
-</Button>
+      <Button
+        type="button"
+        variant="secondary"
+        onClick={() => onView(baseline)}
+        style={iconButtonStyle}
+        title="View Baseline"
+      >
+        <Eye size={16} />
+      </Button>
 
       {isApproved ? (
-<Button
-  type="button"
-  onClick={() => onUnlock(baseline.id)}
-  style={iconButtonStyle}
-  title="Create Revision"
->
-  <RotateCcw size={16} />
-</Button>
+        <Button
+          type="button"
+          onClick={() => onUnlock(baseline.id)}
+          style={iconButtonStyle}
+          title="Create Revision"
+        >
+          <RotateCcw size={16} />
+        </Button>
       ) : (
         baseline.isActive && (
           <PermissionGuard permissions={['schedules:update']}>
-<Button
-  type="button"
-  variant="secondary"
-  onClick={() => onEdit(baseline)}
-  style={iconButtonStyle}
-  title="Edit Baseline"
->
-  <Pencil size={16} />
-</Button>
+            <Button
+              type="button"
+              variant="secondary"
+              onClick={() => onEdit(baseline)}
+              style={iconButtonStyle}
+              title="Edit Baseline"
+            >
+              <Pencil size={16} />
+            </Button>
           </PermissionGuard>
         )
       )}
 
       <PermissionGuard permissions={['schedules:update']}>
-<Button
-  type="button"
-  variant="secondary"
-  onClick={() => onEditStatus(baseline)}
-  style={iconButtonStyle}
-  title="Change Status"
->
-  <Settings2 size={16} />
-</Button>
+        <Button
+          type="button"
+          variant="secondary"
+          onClick={() => onEditStatus(baseline)}
+          style={iconButtonStyle}
+          title="Change Status"
+        >
+          <Settings2 size={16} />
+        </Button>
       </PermissionGuard>
 
       {isDraft && baseline.isActive && (
         <PermissionGuard permissions={['schedules:update']}>
-<Button
-  type="button"
-  onClick={() => onSubmitForApproval(baseline.id)}
-  style={iconButtonStyle}
-  title="Submit For Approval"
->
-  <Send size={16} />
-</Button>
+          <Button
+            type="button"
+            onClick={() => onSubmitForApproval(baseline.id)}
+            style={iconButtonStyle}
+            title="Submit For Approval"
+          >
+            <Send size={16} />
+          </Button>
         </PermissionGuard>
       )}
 
@@ -672,15 +726,15 @@ const iconButtonStyle: React.CSSProperties = {
 
       {baseline.isActive ? (
         <PermissionGuard permissions={['schedules:delete']}>
-<Button
-  type="button"
-  variant="danger"
-  onClick={() => onDeactivate(baseline.id)}
-  style={iconButtonStyle}
-  title="Deactivate Baseline"
->
-  <PowerOff size={16} />
-</Button>
+          <Button
+            type="button"
+            variant="danger"
+            onClick={() => onDeactivate(baseline.id)}
+            style={iconButtonStyle}
+            title="Deactivate Baseline"
+          >
+            <PowerOff size={16} />
+          </Button>
         </PermissionGuard>
       ) : (
         <PermissionGuard permissions={['schedules:update']}>
@@ -701,28 +755,62 @@ const iconButtonStyle: React.CSSProperties = {
   );
 }
 
-function BaselineDetailsModal({ baseline, onClose }: { baseline: ScheduleBaseline; onClose: () => void }) {
+function BaselineDetailsModal({
+  baseline,
+  onClose,
+}: {
+  baseline: ScheduleBaseline;
+  onClose: () => void;
+}) {
   return (
-    <div style={modalOverlayStyle} role="dialog" aria-modal="true" aria-labelledby="baseline-details-title">
+    <div
+      style={modalOverlayStyle}
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="baseline-details-title"
+    >
       <div style={modalStyle}>
         <div style={{ display: 'flex', justifyContent: 'space-between', gap: 16 }}>
           <h2 id="baseline-details-title" style={{ margin: 0 }}>
             {baseline.version} - {baseline.name}
           </h2>
+
           <Button type="button" variant="secondary" onClick={onClose}>
             Close
           </Button>
         </div>
 
         <div style={detailsGridStyle}>
-          <Detail label="Status" value={baseline.status} />
+          <Detail label="Status" value={baseline.status || '-'} />
+
+          <Detail
+            label="Rejection Reason"
+            value={baseline.rejectionReason || '-'}
+            wide
+          />
+
           <Detail label="Active" value={baseline.isActive ? 'Yes' : 'No'} />
           <Detail label="Tasks" value={String(baseline.items?.length ?? 0)} />
           <Detail label="Created" value={formatDate(baseline.createdAt)} />
           <Detail label="Approved At" value={formatDate(baseline.approvedAt)} />
-          <Detail label="Planned Start" value={formatDate((baseline as any).plannedStartDate)} />
-          <Detail label="Planned Finish" value={formatDate((baseline as any).plannedFinishDate)} />
-          <Detail label="Description" value={baseline.description || '-'} wide />
+          <Detail label="Rejected At" value={formatDate(baseline.rejectedAt)} />
+          <Detail label="Submitted At" value={formatDate(baseline.submittedAt)} />
+
+          <Detail
+            label="Planned Start"
+            value={formatDate((baseline as any).plannedStartDate)}
+          />
+
+          <Detail
+            label="Planned Finish"
+            value={formatDate((baseline as any).plannedFinishDate)}
+          />
+
+          <Detail
+            label="Description"
+            value={baseline.description || '-'}
+            wide
+          />
         </div>
       </div>
     </div>

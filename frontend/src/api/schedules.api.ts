@@ -1,4 +1,3 @@
-
 import { api } from './client';
 
 export type ScheduleBaselineItem = {
@@ -33,22 +32,26 @@ export type ScheduleBaseline = {
   version: string;
   status: ScheduleBaselineStatus;
   isActive: boolean;
+
   approvedAt?: string | null;
   approvedBy?: number | null;
+
   rejectedAt?: string | null;
   rejectedBy?: number | null;
   rejectionReason?: string | null;
+
   submittedAt?: string | null;
   submittedBy?: number | null;
+
   createdAt: string;
   updatedAt?: string;
+
   items?: ScheduleBaselineItem[];
 };
 
 export type CreateBaselinePayload = {
   projectId: number;
   name: string;
-  version: string;
   description?: string;
 };
 
@@ -114,10 +117,9 @@ export const schedulesApi = {
     const response = await api.patch(`/schedules/baselines/${id}/activate`);
     return response.data;
   },
+
   unlockBaseline: async (id: number): Promise<ScheduleBaseline> => {
-  const response = await api.post(`/schedules/baselines/${id}/unlock`);
-  return response.data;
-},
-
+    const response = await api.post(`/schedules/baselines/${id}/unlock`);
+    return response.data;
+  },
 };
-
