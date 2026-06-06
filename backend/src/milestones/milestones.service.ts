@@ -21,10 +21,12 @@ export class MilestonesService {
       throw new NotFoundException('Project not found');
     }
 
+    const code = await this.generateMilestoneCode(dto.projectId);
+
     const milestone = await this.prisma.milestone.create({
       data: {
         projectId: dto.projectId,
-        code: dto.code,
+        code,
         name: dto.name,
         description: dto.description ?? null,
         plannedDate: new Date(dto.plannedDate),
@@ -32,9 +34,7 @@ export class MilestonesService {
         status: dto.status ?? 'PLANNED',
         isActive: true,
       },
-      include: {
-        project: true,
-      },
+      include: this.milestoneInclude(),
     });
 
     await this.auditService.create({
@@ -54,27 +54,15 @@ export class MilestonesService {
   findByProject(projectId: number) {
     return this.prisma.milestone.findMany({
       where: { projectId },
-      include: {
-        project: {
-          select: {
-            id: true,
-            code: true,
-            name: true,
-          },
-        },
-      },
-      orderBy: {
-        plannedDate: 'asc',
-      },
+      include: this.milestoneInclude(),
+      orderBy: [{ plannedDate: 'asc' }, { code: 'asc' }],
     });
   }
 
   async findOne(id: number) {
     const milestone = await this.prisma.milestone.findUnique({
       where: { id },
-      include: {
-        project: true,
-      },
+      include: this.milestoneInclude(),
     });
 
     if (!milestone) {
@@ -101,16 +89,18 @@ export class MilestonesService {
       where: { id },
       data: {
         projectId: dto.projectId,
-        code: dto.code,
         name: dto.name,
         description: dto.description,
         plannedDate: dto.plannedDate ? new Date(dto.plannedDate) : undefined,
-        actualDate: dto.actualDate ? new Date(dto.actualDate) : undefined,
+        actualDate:
+          dto.actualDate === ''
+            ? null
+            : dto.actualDate
+              ? new Date(dto.actualDate)
+              : undefined,
         status: dto.status,
       },
-      include: {
-        project: true,
-      },
+      include: this.milestoneInclude(),
     });
 
     await this.auditService.create({
@@ -137,9 +127,7 @@ export class MilestonesService {
         status: 'CANCELLED',
         isActive: false,
       },
-      include: {
-        project: true,
-      },
+      include: this.milestoneInclude(),
     });
 
     await this.auditService.create({
@@ -166,9 +154,7 @@ export class MilestonesService {
         status: 'PLANNED',
         isActive: true,
       },
-      include: {
-        project: true,
-      },
+      include: this.milestoneInclude(),
     });
 
     await this.auditService.create({
@@ -184,5 +170,25 @@ export class MilestonesService {
     });
 
     return activatedMilestone;
+  }
+
+  private async generateMilestoneCode(projectId: number) {
+    const count = await this.prisma.milestone.count({
+      where: { projectId },
+    });
+
+    return `MS-${String(count + 1).padStart(3, '0')}`;
+  }
+
+  private milestoneInclude() {
+    return {
+      project: {
+        select: {
+          id: true,
+          code: true,
+          name: true,
+        },
+      },
+    };
   }
 }

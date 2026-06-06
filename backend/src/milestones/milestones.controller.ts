@@ -35,10 +35,12 @@ export class MilestonesController {
   findOne(@Param('id', ParseIntPipe) id: number) {
     return this.milestonesService.findOne(id);
   }
-@Patch(':id/activate')
-activate(@Param('id', ParseIntPipe) id: number, @Req() req: any) {
-  return this.milestonesService.activate(id, Number(req.user?.sub));
-}
+
+  @Patch(':id/activate')
+  activate(@Param('id', ParseIntPipe) id: number, @Req() req: any) {
+    return this.milestonesService.activate(id, Number(req.user?.sub));
+  }
+
   @Patch(':id')
   update(
     @Param('id', ParseIntPipe) id: number,

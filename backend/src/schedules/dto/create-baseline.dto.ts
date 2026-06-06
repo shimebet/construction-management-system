@@ -1,14 +1,12 @@
-import { IsNumber, IsOptional, IsString } from 'class-validator';
+import { IsInt, IsNotEmpty, IsOptional, IsString } from 'class-validator';
 
 export class CreateBaselineDto {
-  @IsNumber()
-  projectId!: number;
+  @IsInt()
+  projectId: number;
 
   @IsString()
-  name!: string;
-
-  @IsString()
-  version!: string;
+  @IsNotEmpty()
+  name: string;
 
   @IsOptional()
   @IsString()

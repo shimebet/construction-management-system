@@ -34,13 +34,7 @@ export class SchedulesController {
   findOne(@Param('id', ParseIntPipe) id: number) {
     return this.schedulesService.findOne(id);
   }
-@Post('baselines/:id/unlock')
-unlockBaseline(
-  @Param('id', ParseIntPipe) id: number,
-  @CurrentUser() user: any,
-) {
-  return this.schedulesService.unlockBaseline(id, Number(user.sub));
-}
+
   @Patch('baselines/:id')
   updateBaseline(
     @Param('id', ParseIntPipe) id: number,
@@ -59,7 +53,10 @@ unlockBaseline(
   }
 
   @Post('baselines/:id/approve')
-  approveBaseline(@Param('id', ParseIntPipe) id: number, @CurrentUser() user: any) {
+  approveBaseline(
+    @Param('id', ParseIntPipe) id: number,
+    @CurrentUser() user: any,
+  ) {
     return this.schedulesService.approveBaseline(id, Number(user.sub));
   }
 
@@ -72,18 +69,35 @@ unlockBaseline(
     return this.schedulesService.rejectBaseline(id, reason, Number(user.sub));
   }
 
+  @Post('baselines/:id/unlock')
+  unlockBaseline(
+    @Param('id', ParseIntPipe) id: number,
+    @CurrentUser() user: any,
+  ) {
+    return this.schedulesService.unlockBaseline(id, Number(user.sub));
+  }
+
+  @Patch('baselines/:id/activate')
+  activateBaseline(
+    @Param('id', ParseIntPipe) id: number,
+    @CurrentUser() user: any,
+  ) {
+    return this.schedulesService.activateBaseline(id, Number(user.sub));
+  }
+
   @Delete('baselines/:id')
-  removeBaseline(@Param('id', ParseIntPipe) id: number, @CurrentUser() user: any) {
+  removeBaseline(
+    @Param('id', ParseIntPipe) id: number,
+    @CurrentUser() user: any,
+  ) {
     return this.schedulesService.removeBaseline(id, Number(user.sub));
   }
 
   @Delete('baselines/:id/hard-delete')
-  deleteBaseline(@Param('id', ParseIntPipe) id: number, @CurrentUser() user: any) {
+  deleteBaseline(
+    @Param('id', ParseIntPipe) id: number,
+    @CurrentUser() user: any,
+  ) {
     return this.schedulesService.deleteBaseline(id, Number(user.sub));
-  }
-
-  @Patch('baselines/:id/activate')
-  activateBaseline(@Param('id', ParseIntPipe) id: number, @CurrentUser() user: any) {
-    return this.schedulesService.activateBaseline(id, Number(user.sub));
   }
 }

@@ -1,34 +1,33 @@
-import { IsDateString, IsEnum, IsNumber, IsOptional, IsString } from 'class-validator';
-
-export enum MilestoneStatusDto {
-  PLANNED = 'PLANNED',
-  ACHIEVED = 'ACHIEVED',
-  DELAYED = 'DELAYED',
-  CANCELLED = 'CANCELLED',
-}
+import {
+  IsDateString,
+  IsInt,
+  IsNotEmpty,
+  IsOptional,
+  IsString,
+  IsEnum,
+} from 'class-validator';
+import { MilestoneStatus } from '@prisma/client';
 
 export class CreateMilestoneDto {
-  @IsNumber()
-  projectId!: number;
+  @IsInt()
+  projectId: number;
 
   @IsString()
-  code!: string;
-
-  @IsString()
-  name!: string;
+  @IsNotEmpty()
+  name: string;
 
   @IsOptional()
   @IsString()
   description?: string;
 
   @IsDateString()
-  plannedDate!: string;
+  plannedDate: string;
 
   @IsOptional()
   @IsDateString()
   actualDate?: string;
 
   @IsOptional()
-  @IsEnum(MilestoneStatusDto)
-  status?: MilestoneStatusDto;
+  @IsEnum(MilestoneStatus)
+  status?: MilestoneStatus;
 }

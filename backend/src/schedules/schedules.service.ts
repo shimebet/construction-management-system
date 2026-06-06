@@ -12,6 +12,19 @@ export class SchedulesService {
     private readonly auditService: AuditService,
   ) {}
 
+  private async generateBaselineVersion(projectId: number) {
+    const latestBaseline = await this.prisma.scheduleBaseline.findFirst({
+      where: { projectId },
+      orderBy: { id: 'desc' },
+    });
+
+    const latestNumber = Number(
+      String(latestBaseline?.version || 'BL-000').replace('BL-', ''),
+    );
+
+    return `BL-${String(latestNumber + 1).padStart(3, '0')}`;
+  }
+
   async createBaseline(dto: CreateBaselineDto, userId?: number) {
     const project = await this.prisma.project.findUnique({
       where: { id: dto.projectId },
@@ -19,17 +32,6 @@ export class SchedulesService {
 
     if (!project) {
       throw new NotFoundException('Project not found');
-    }
-
-    const existingVersion = await this.prisma.scheduleBaseline.findFirst({
-      where: {
-        projectId: dto.projectId,
-        version: dto.version,
-      },
-    });
-
-    if (existingVersion) {
-      throw new BadRequestException('Baseline version already exists for this project');
     }
 
     const tasks = await this.prisma.task.findMany({
@@ -43,11 +45,13 @@ export class SchedulesService {
       throw new BadRequestException('Cannot create baseline without active tasks');
     }
 
+    const version = await this.generateBaselineVersion(dto.projectId);
+
     const baseline = await this.prisma.scheduleBaseline.create({
       data: {
         projectId: dto.projectId,
         name: dto.name,
-        version: dto.version,
+        version,
         description: dto.description ?? null,
         status: 'DRAFT',
         isActive: true,
@@ -114,26 +118,11 @@ export class SchedulesService {
       throw new BadRequestException('Inactive baseline cannot be edited');
     }
 
-    if (dto.version && dto.version !== oldBaseline.version) {
-      const existingVersion = await this.prisma.scheduleBaseline.findFirst({
-        where: {
-          projectId: dto.projectId ?? oldBaseline.projectId,
-          version: dto.version,
-          NOT: { id },
-        },
-      });
-
-      if (existingVersion) {
-        throw new BadRequestException('Baseline version already exists for this project');
-      }
-    }
-
     const updated = await this.prisma.scheduleBaseline.update({
       where: { id },
       data: {
         projectId: dto.projectId,
         name: dto.name,
-        version: dto.version,
         description: dto.description,
       },
       include: this.baselineInclude(),
@@ -366,7 +355,9 @@ export class SchedulesService {
     const status = String(oldBaseline.status);
 
     if (status === 'APPROVED') {
-      throw new BadRequestException('Approved baseline is already controlled and cannot be reset to draft');
+      throw new BadRequestException(
+        'Approved baseline is already controlled and cannot be reset to draft',
+      );
     }
 
     const activated = await this.prisma.scheduleBaseline.update({
@@ -393,6 +384,52 @@ export class SchedulesService {
     return activated;
   }
 
+  async unlockBaseline(id: number, userId?: number) {
+    const baseline = await this.findOne(id);
+    const status = String(baseline.status);
+
+    if (status !== 'APPROVED') {
+      throw new BadRequestException('Only approved baselines can be unlocked');
+    }
+
+    const newVersion = await this.generateBaselineVersion(baseline.projectId);
+
+    const unlocked = await this.prisma.scheduleBaseline.create({
+      data: {
+        projectId: baseline.projectId,
+        name: `${baseline.name} Revision`,
+        version: newVersion,
+        description: baseline.description,
+        status: 'DRAFT',
+        isActive: true,
+        items: {
+          create:
+            baseline.items?.map((item) => ({
+              taskId: item.taskId,
+              plannedStart: item.plannedStart,
+              plannedEnd: item.plannedEnd,
+              durationDays: item.durationDays,
+            })) || [],
+        },
+      },
+      include: this.baselineInclude(),
+    });
+
+    await this.auditService.create({
+      userId,
+      projectId: baseline.projectId,
+      action: AuditAction.CREATE,
+      module: 'schedules',
+      entityName: 'ScheduleBaseline',
+      entityId: String(unlocked.id),
+      description: `Created revision baseline ${newVersion} from ${baseline.version}`,
+      oldData: baseline,
+      newData: unlocked,
+    });
+
+    return unlocked;
+  }
+
   private baselineInclude() {
     return {
       project: true,
@@ -415,69 +452,4 @@ export class SchedulesService {
       },
     };
   }
-  async unlockBaseline(id: number, userId?: number) {
-  const baseline = await this.findOne(id);
-
-  const status = String(baseline.status);
-
-  if (status !== 'APPROVED') {
-    throw new BadRequestException(
-      'Only approved baselines can be unlocked',
-    );
-  }
-
-  const latestBaseline = await this.prisma.scheduleBaseline.findFirst({
-    where: {
-      projectId: baseline.projectId,
-    },
-    orderBy: {
-      createdAt: 'desc',
-    },
-  });
-
-  const nextVersionNumber =
-    Number(
-      String(latestBaseline?.version || 'BL-000')
-        .replace('BL-', ''),
-    ) + 1;
-
-  const newVersion = `BL-${String(nextVersionNumber).padStart(3, '0')}`;
-
-  const unlocked = await this.prisma.scheduleBaseline.create({
-    data: {
-      projectId: baseline.projectId,
-      name: `${baseline.name} Revision`,
-      version: newVersion,
-      description: baseline.description,
-      status: 'DRAFT',
-      isActive: true,
-
-      items: {
-        create:
-          baseline.items?.map((item) => ({
-            taskId: item.taskId,
-            plannedStart: item.plannedStart,
-            plannedEnd: item.plannedEnd,
-            durationDays: item.durationDays,
-          })) || [],
-      },
-    },
-
-    include: this.baselineInclude(),
-  });
-
-  await this.auditService.create({
-    userId,
-    projectId: baseline.projectId,
-    action: AuditAction.CREATE,
-    module: 'schedules',
-    entityName: 'ScheduleBaseline',
-    entityId: String(unlocked.id),
-    description: `Created revision baseline ${newVersion} from ${baseline.version}`,
-    oldData: baseline,
-    newData: unlocked,
-  });
-
-  return unlocked;
-}
-}
+} 
