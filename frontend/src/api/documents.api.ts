@@ -28,7 +28,7 @@ export type DocumentVersion = {
     name: string;
     email: string;
     jobTitle?: string | null;
-  } | null;
+  } | null;  
 };
 
 export type ProjectDocument = {
@@ -39,6 +39,7 @@ export type ProjectDocument = {
   type: DocumentType;
   discipline?: string | null;
   originator?: string | null;
+  rejectionReason?: string | null;
   zone?: string | null;
   level?: string | null;
   status: DocumentStatus;
@@ -67,7 +68,10 @@ export type CreateDocumentPayload = {
   currentRevision?: string;
   description?: string;
 };
-
+export type ChangeDocumentStatusPayload = {
+  status: DocumentStatus;
+  rejectionReason?: string;
+};
 export const documentsApi = {
   findByProject: async (projectId: number): Promise<ProjectDocument[]> => {
     const response = await api.get(`/documents/project/${projectId}`);
@@ -97,46 +101,45 @@ export const documentsApi = {
     return response.data;
   },
 
-  changeStatus: async (
-    id: number,
-    status: DocumentStatus,
-  ): Promise<ProjectDocument> => {
-    const response = await api.patch(`/documents/${id}/status/${status}`);
-    return response.data;
-  },
+changeStatus: async (
+  id: number,
+  data: ChangeDocumentStatusPayload,
+): Promise<ProjectDocument> => {
+  const response = await api.patch(`/documents/${id}/status`, data);
+  return response.data;
+},
 
-  findVersions: async (documentId: number): Promise<DocumentVersion[]> => {
-    const response = await api.get(`/documents/${documentId}/versions`);
-    return response.data;
+uploadVersion: async (
+  documentId: number,
+  data: {
+    file: File;
+    revision?: string;
+    status: DocumentStatus;
+    notes?: string;
   },
+): Promise<DocumentVersion> => {
+  const formData = new FormData();
+  formData.append('file', data.file);
 
-  uploadVersion: async (
-    documentId: number,
-    data: {
-      file: File;
-      revision: string;
-      status: DocumentStatus;
-      notes?: string;
-    },
-  ): Promise<DocumentVersion> => {
-    const formData = new FormData();
-    formData.append('file', data.file);
+  if (data.revision) {
     formData.append('revision', data.revision);
-    formData.append('status', data.status);
-    formData.append('notes', data.notes ?? '');
+  }
 
-    const response = await api.post(
-      `/documents/${documentId}/upload-version`,
-      formData,
-      {
-        headers: {
-          'Content-Type': 'multipart/form-data',
-        },
+  formData.append('status', data.status);
+  formData.append('notes', data.notes ?? '');
+
+  const response = await api.post(
+    `/documents/${documentId}/upload-version`,
+    formData,
+    {
+      headers: {
+        'Content-Type': 'multipart/form-data',
       },
-    );
+    },
+  );
 
-    return response.data;
-  },
+  return response.data;
+},
 
   getDownloadUrl: (versionId: number) =>
     `${api.defaults.baseURL}/documents/versions/${versionId}/download`,

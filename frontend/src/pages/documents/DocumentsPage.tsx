@@ -70,8 +70,12 @@ export default function DocumentsPage() {
   const [search, setSearch] = useState('');
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState('');
-
+const [statusModalDocument, setStatusModalDocument] =
+  useState<ProjectDocument | null>(null);
+const [statusModalValue, setStatusModalValue] = useState<DocumentStatus>('WIP');
   const [form, setForm] = useState<CreateDocumentPayload>(emptyForm);
+
+const [statusRejectionReason, setStatusRejectionReason] = useState('');
 
   const selectedProject = useMemo(
     () => projects.find((project) => project.id === Number(selectedProjectId)),
@@ -234,10 +238,7 @@ export default function DocumentsPage() {
       return;
     }
 
-    if (!revision.trim()) {
-      setMessage('Revision is required');
-      return;
-    }
+
 
     try {
       setLoading(true);
@@ -245,7 +246,7 @@ export default function DocumentsPage() {
 
       await documentsApi.uploadVersion(Number(selectedDocumentId), {
         file: selectedFile,
-        revision: revision.trim().toUpperCase(),
+        revision: revision.trim() || undefined,
         status: versionStatus,
         notes: versionNotes.trim(),
       });
@@ -315,29 +316,46 @@ export default function DocumentsPage() {
       setLoading(false);
     }
   }
+async function handleConfirmStatusChange() {
+  if (!statusModalDocument) return;
 
-  async function handleChangeStatus(doc: ProjectDocument) {
-    const next = window.prompt('Enter status: WIP, SHARED, PUBLISHED, ARCHIVED, REJECTED', doc.status);
-    if (!next) return;
-
-    const nextStatus = next.trim().toUpperCase() as DocumentStatus;
-    if (!documentStatuses.includes(nextStatus)) {
-      setMessage('Invalid status. Use WIP, SHARED, PUBLISHED, ARCHIVED, or REJECTED.');
-      return;
-    }
-
-    try {
-      setLoading(true);
-      setMessage('');
-      await documentsApi.changeStatus(doc.id, nextStatus);
-      setMessage('Document status updated successfully');
-      if (selectedProjectId) await loadDocuments(Number(selectedProjectId));
-    } catch (error: any) {
-      setMessage(getErrorMessage(error, 'Failed to update document status'));
-    } finally {
-      setLoading(false);
-    }
+  if (statusModalValue === 'REJECTED' && !statusRejectionReason.trim()) {
+    setMessage('Rejection reason is required');
+    return;
   }
+
+  try {
+    setLoading(true);
+    setMessage('');
+
+    await documentsApi.changeStatus(statusModalDocument.id, {
+      status: statusModalValue,
+      rejectionReason:
+        statusModalValue === 'REJECTED'
+          ? statusRejectionReason.trim()
+          : undefined,
+    });
+
+    setMessage('Document status updated successfully');
+    setStatusModalDocument(null);
+    setStatusRejectionReason('');
+
+    if (selectedProjectId) {
+      await loadDocuments(Number(selectedProjectId));
+    }
+  } catch (error: any) {
+    setMessage(getErrorMessage(error, 'Failed to update document status'));
+  } finally {
+    setLoading(false);
+  }
+}
+
+
+function handleChangeStatus(doc: ProjectDocument) {
+  setStatusModalDocument(doc);
+  setStatusModalValue(doc.status);
+  setStatusRejectionReason(doc.rejectionReason || '');
+}
 
   return (
     <div>
@@ -415,7 +433,12 @@ export default function DocumentsPage() {
                 ))}
               </SelectField>
 
-              <Input label="Revision" placeholder="P01 / C01" value={revision} onChange={(e) => setRevision(e.target.value)} required />
+              <Input
+                label="Revision"
+                placeholder="Auto-generated if empty, e.g. P01 / P02 / C01"
+                value={revision}
+                onChange={(e) => setRevision(e.target.value)}
+              />
 
               <SelectField label="Version Status" value={versionStatus} onChange={(value) => setVersionStatus(value as DocumentStatus)}>
                 {documentStatuses.map((status) => <option key={status} value={status}>{status}</option>)}
@@ -448,6 +471,13 @@ export default function DocumentsPage() {
               { header: 'Title', accessor: 'title' },
               { header: 'Type', accessor: 'type' },
               { header: 'Status', accessor: (row) => <StatusBadge status={row.status} /> },
+              {
+  header: 'Rejection Reason',
+  accessor: (row) =>
+    row.status === 'REJECTED'
+      ? row.rejectionReason || '-'
+      : '-',
+},
               { header: 'Revision', accessor: (row) => row.currentRevision || '-' },
               { header: 'Versions', accessor: (row) => row.versions?.length ?? 0 },
               {
@@ -459,7 +489,7 @@ export default function DocumentsPage() {
                       <IconOnlyButton title="View Details" onClick={() => setSelectedDocument(row)}><Eye size={15} /></IconOnlyButton>
                       <IconOnlyButton title="Edit" onClick={() => handleEdit(row)}><Edit size={15} /></IconOnlyButton>
                       <IconOnlyButton title="Change Status" onClick={() => handleChangeStatus(row)}><Settings2 size={15} /></IconOnlyButton>
-                      <IconOnlyButton title="Archive" onClick={() => handleArchive(row.id)} color="#dc2626"><Archive size={15} /></IconOnlyButton>
+                      {/* <IconOnlyButton title="Archive" onClick={() => handleArchive(row.id)} color="#dc2626"><Archive size={15} /></IconOnlyButton> */}
                       {latest ? (
                         <IconOnlyButton title="Download Latest" onClick={() => handleDownload(latest.id, latest.fileName)} color="#2563eb"><Download size={15} /></IconOnlyButton>
                       ) : (
@@ -475,7 +505,61 @@ export default function DocumentsPage() {
           />
         </Card>
       </div>
+{statusModalDocument && (
+  <div style={modalOverlayStyle} role="dialog" aria-modal="true">
+    <div style={{ ...modalStyle, width: 'min(460px, 100%)' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', gap: 16 }}>
+        <h2 style={{ margin: 0 }}>Change Document Status</h2>
 
+        <Button
+          type="button"
+          variant="secondary"
+          onClick={() => setStatusModalDocument(null)}
+        >
+          <X size={15} /> Close
+        </Button>
+      </div>
+
+      <p style={{ color: '#64748b', marginTop: 12 }}>
+        Select the next controlled-document status for{' '}
+        <strong>{statusModalDocument.code}</strong>.
+      </p>
+
+      <SelectField
+        label="Status"
+        value={statusModalValue}
+        onChange={(value) => setStatusModalValue(value as DocumentStatus)}
+      >
+        {documentStatuses.map((status) => (
+          <option key={status} value={status}>
+            {status.replace(/_/g, ' ')}
+          </option>
+        ))}
+      </SelectField>
+      {statusModalValue === 'REJECTED' && (
+  <TextAreaField
+    label="Rejection Reason"
+    value={statusRejectionReason}
+    onChange={setStatusRejectionReason}
+  />
+)}
+
+      <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10 }}>
+        <Button
+          type="button"
+          variant="secondary"
+          onClick={() => setStatusModalDocument(null)}
+        >
+          Cancel
+        </Button>
+
+        <Button type="button" disabled={loading} onClick={handleConfirmStatusChange}>
+          Update Status
+        </Button>
+      </div>
+    </div>
+  </div>
+)}
       {selectedDocument && (
         <DocumentDetailsModal document={selectedDocument} onClose={() => setSelectedDocument(null)} onDownload={handleDownload} />
       )}
