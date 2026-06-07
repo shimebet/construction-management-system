@@ -13,58 +13,53 @@ export type SubmittalStatus =
 export type Submittal = {
   id: number;
   projectId: number;
+
   code: string;
+  submittalNo?: string | null;
+
   title: string;
   description?: string | null;
+  specificationReference?: string | null;
+
   status: SubmittalStatus | string;
   revision?: string | null;
+  reviewCycle?: number | null;
+
   submittedAt?: string | null;
+  submissionDate?: string | null;
+  reviewDate?: string | null;
+  approvalDate?: string | null;
   dueDate?: string | null;
   closedAt?: string | null;
+
+  comments?: string | null;
+  rejectionReason?: string | null;
+
   createdAt?: string;
   updatedAt?: string;
+
   createdById?: number | null;
+  submittedById?: number | null;
   reviewerId?: number | null;
+  reviewedById?: number | null;
   documentId?: number | null;
-  project?: {
-    id: number;
-    code: string;
-    name: string;
-  } | null;
-  createdBy?: {
-    id: number;
-    name: string;
-    email: string;
-    jobTitle?: string | null;
-  } | null;
-  document?: {
-    id: number;
-    code: string;
-    title: string;
-  } | null;
-  reviewer?: {
-    id: number;
-    name: string;
-    email: string;
-    jobTitle?: string | null;
-  } | null;
-  approvals?: Array<{
-    id: number;
-    status: string;
-    comments?: string | null;
-    approvedAt?: string | null;
-    createdAt?: string;
-  }>;
+
+  project?: { id: number; code: string; name: string } | null;
+  document?: { id: number; code: string; title: string } | null;
+
+  createdBy?: { id: number; name: string; email: string; jobTitle?: string | null } | null;
+  submittedBy?: { id: number; name: string; email: string; jobTitle?: string | null } | null;
+  reviewer?: { id: number; name: string; email: string; jobTitle?: string | null } | null;
+  reviewedBy?: { id: number; name: string; email: string; jobTitle?: string | null } | null;
 };
 
 export type CreateSubmittalPayload = {
   projectId: number;
-  code: string;
   title: string;
   description?: string;
+  specificationReference?: string;
   status?: SubmittalStatus | string;
   revision?: string;
-  submittedAt?: string;
   dueDate?: string;
   reviewerId?: number | null;
   documentId?: number | null;
@@ -75,6 +70,7 @@ export type UpdateSubmittalPayload = Partial<CreateSubmittalPayload>;
 export type ReviewSubmittalPayload = {
   status: SubmittalStatus | string;
   comments?: string;
+  rejectionReason?: string;
 };
 
 export const submittalsApi = {

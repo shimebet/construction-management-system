@@ -11,7 +11,7 @@ export type Rfi = {
   question: string;
   response?: string | null;
   status: RfiStatus | string;
-  priority: RfiPriority | string;
+  priority: RfiPriority | string; 
   createdById?: number | null;
   assignedToId?: number | null;
   dueDate?: string | null;
@@ -40,7 +40,6 @@ export type Rfi = {
 
 export type CreateRfiPayload = {
   projectId: number;
-  code: string;
   title: string;
   question: string;
   status?: RfiStatus | string;

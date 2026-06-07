@@ -11,7 +11,7 @@ import {
   X,
   XCircle,
 } from 'lucide-react';
-
+ 
 import { projectsApi } from '../../api/projects.api';
 import type { Project } from '../../api/projects.api';
 import { rfisApi } from '../../api/rfis.api';
@@ -20,7 +20,6 @@ import { Button, Card, DataTable, Input, PageHeader } from '../../components/ui'
 
 const emptyForm: CreateRfiPayload = {
   projectId: 0,
-  code: '',
   title: '',
   question: '',
   status: 'OPEN',
@@ -133,7 +132,6 @@ export default function RfisPage() {
 
   function validateForm() {
     if (!form.projectId) return 'Project is required';
-    if (!form.code.trim()) return 'RFI code is required';
     if (!form.title.trim()) return 'Title is required';
     if (!form.question.trim()) return 'Question is required';
     return '';
@@ -155,7 +153,6 @@ export default function RfisPage() {
       const payload: CreateRfiPayload = {
         ...form,
         projectId: Number(form.projectId),
-        code: form.code.trim().toUpperCase(),
         title: form.title.trim(),
         question: form.question.trim(),
         status: String(form.status || 'OPEN').toUpperCase(),
@@ -195,7 +192,6 @@ export default function RfisPage() {
     setSelectedRfi(null);
     setForm({
       projectId: rfi.projectId,
-      code: rfi.code || '',
       title: rfi.title || '',
       question: rfi.question || '',
       status: rfi.status || 'OPEN',
@@ -303,7 +299,6 @@ export default function RfisPage() {
                 ))}
               </SelectField>
 
-              <Input label="RFI Code" value={form.code} onChange={(e) => updateField('code', e.target.value)} required />
               <Input label="Title" value={form.title} onChange={(e) => updateField('title', e.target.value)} required />
               <TextareaField label="Question" value={form.question} onChange={(value) => updateField('question', value)} />
 
