@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+
 import {
   CheckCircle2,
   Edit,
@@ -12,9 +13,13 @@ import {
 } from 'lucide-react';
 
 import { approvalsApi } from '../../api/approvals.api';
+import { rfisApi } from '../../api/rfis.api';
+import type { Rfi } from '../../api/rfis.api';
+import { submittalsApi } from '../../api/submittals.api';
+import type { Submittal } from '../../api/submittals.api';
 import type {
   Approval,
-  ApprovalStatus,
+  ApprovalStatus, 
   CreateApprovalPayload,
 } from '../../api/approvals.api';
 import { projectsApi } from '../../api/projects.api';
@@ -46,6 +51,9 @@ export default function ApprovalsPage() {
   const [statusFilter, setStatusFilter] = useState('');
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState('');
+  const [rfis, setRfis] = useState<Rfi[]>([]);
+const [submittals, setSubmittals] = useState<Submittal[]>([]);
+const [approvalTarget, setApprovalTarget] = useState('');
 
   const [form, setForm] = useState<CreateApprovalPayload>(emptyForm);
 
@@ -88,23 +96,33 @@ export default function ApprovalsPage() {
     }
   }
 
-  async function loadApprovals(projectId: number) {
-    if (!projectId) {
-      setApprovals([]);
-      return;
-    }
-
-    try {
-      setLoading(true);
-      setMessage('');
-      const data = await approvalsApi.findByProject(projectId);
-      setApprovals(data);
-    } catch (error: any) {
-      setMessage(getErrorMessage(error, 'Failed to load approvals'));
-    } finally {
-      setLoading(false);
-    }
+async function loadApprovals(projectId: number) {
+  if (!projectId) {
+    setApprovals([]);
+    setRfis([]);
+    setSubmittals([]);
+    return;
   }
+
+  try {
+    setLoading(true);
+    setMessage('');
+
+    const [approvalData, rfiData, submittalData] = await Promise.all([
+      approvalsApi.findByProject(projectId),
+      rfisApi.findByProject(projectId),
+      submittalsApi.findByProject(projectId),
+    ]);
+
+    setApprovals(approvalData);
+    setRfis(rfiData);
+    setSubmittals(submittalData);
+  } catch (error: any) {
+    setMessage(getErrorMessage(error, 'Failed to load approvals'));
+  } finally {
+    setLoading(false);
+  }
+}
 
   async function handleProjectChange(value: string) {
     const projectId = Number(value);
@@ -120,7 +138,46 @@ export default function ApprovalsPage() {
   function updateField(name: keyof CreateApprovalPayload, value: string | number | null) {
     setForm((prev) => ({ ...prev, [name]: value }));
   }
+function handleApprovalTargetChange(value: string) {
+  setApprovalTarget(value);
 
+  if (!value) {
+    setForm((prev) => ({
+      ...prev,
+      module: '',
+      entityName: '',
+      entityId: 0,
+      rfiId: null,
+      submittalId: null,
+    }));
+    return;
+  }
+
+  const [module, idText] = value.split(':');
+  const entityId = Number(idText);
+
+  if (module === 'rfis') {
+    setForm((prev) => ({
+      ...prev,
+      module: 'rfis',
+      entityName: 'Rfi',
+      entityId,
+      rfiId: entityId,
+      submittalId: null,
+    }));
+  }
+
+  if (module === 'submittals') {
+    setForm((prev) => ({
+      ...prev,
+      module: 'submittals',
+      entityName: 'Submittal',
+      entityId,
+      rfiId: null,
+      submittalId: entityId,
+    }));
+  }
+}
   function validateForm() {
     if (!form.projectId) return 'Project is required';
     if (!form.module.trim()) return 'Module is required';
@@ -168,31 +225,41 @@ export default function ApprovalsPage() {
     }
   }
 
-  function resetForm(projectId = Number(selectedProjectId || 0)) {
-    setEditingApproval(null);
-    setForm({ ...emptyForm, projectId });
+ function resetForm(projectId = Number(selectedProjectId || 0)) {
+  setEditingApproval(null);
+  setApprovalTarget('');
+  setForm({ ...emptyForm, projectId });
+}
+
+function handleEdit(approval: Approval) {
+  if (approval.status !== 'PENDING') {
+    setMessage('Only pending approvals can be edited');
+    return;
   }
 
-  function handleEdit(approval: Approval) {
-    if (approval.status !== 'PENDING') {
-      setMessage('Only pending approvals can be edited');
-      return;
-    }
+  setEditingApproval(approval);
+  setSelectedApproval(null);
 
-    setEditingApproval(approval);
-    setSelectedApproval(null);
-    setForm({
-      projectId: approval.projectId,
-      userId: approval.userId ?? undefined,
-      status: approval.status,
-      module: approval.module || '',
-      entityName: approval.entityName || '',
-      entityId: approval.entityId,
-      rfiId: approval.rfi?.id,
-      submittalId: approval.submittal?.id,
-      comments: approval.comments || '',
-    });
-  }
+  const targetValue = approval.rfi?.id
+    ? `rfis:${approval.rfi.id}`
+    : approval.submittal?.id
+      ? `submittals:${approval.submittal.id}`
+      : '';
+
+  setApprovalTarget(targetValue);
+
+  setForm({
+    projectId: approval.projectId,
+    userId: approval.userId ?? undefined,
+    status: approval.status,
+    module: approval.module || '',
+    entityName: approval.entityName || '',
+    entityId: approval.entityId,
+    rfiId: approval.rfi?.id ?? null,
+    submittalId: approval.submittal?.id ?? null,
+    comments: approval.comments || '',
+  });
+}
 
   async function handleReview(e: React.FormEvent) {
     e.preventDefault();
@@ -281,9 +348,29 @@ export default function ApprovalsPage() {
                 {projects.map((project) => <option key={project.id} value={project.id}>{project.code} - {project.name}</option>)}
               </SelectField>
 
-              <Input label="Module" placeholder="submittals" value={form.module} onChange={(e) => updateField('module', e.target.value)} required />
-              <Input label="Entity Name" placeholder="Submittal" value={form.entityName} onChange={(e) => updateField('entityName', e.target.value)} required />
-              <Input label="Entity ID" type="number" value={form.entityId || ''} onChange={(e) => updateField('entityId', Number(e.target.value))} required />
+              <SelectField
+  label="Approval Target"
+  value={approvalTarget}
+  onChange={handleApprovalTargetChange}
+>
+  <option value="">Select approval target</option>
+
+  <optgroup label="RFIs">
+    {rfis.map((rfi) => (
+      <option key={`rfi-${rfi.id}`} value={`rfis:${rfi.id}`}>
+        {rfi.code} - {rfi.title}
+      </option>
+    ))}
+  </optgroup>
+
+  <optgroup label="Submittals">
+    {submittals.map((submittal) => (
+      <option key={`submittal-${submittal.id}`} value={`submittals:${submittal.id}`}>
+        {submittal.code} - {submittal.title}
+      </option>
+    ))}
+  </optgroup>
+</SelectField>
 
               <SelectField label="Status" value={form.status ?? 'PENDING'} onChange={(value) => updateField('status', value)}>
                 {approvalStatuses.map((status) => <option key={status} value={status}>{status}</option>)}

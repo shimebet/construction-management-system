@@ -19,7 +19,7 @@ export type Approval = {
     code: string;
     name: string;
   };
-  user?: {
+  user?: { 
     id: number;
     name: string;
     email: string;
