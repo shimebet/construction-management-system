@@ -3,11 +3,13 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { AuditAction } from '@prisma/client';
+
 import { AuditService } from '../audit/audit.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateDailyReportDto } from './dto/create-daily-report.dto';
 import { UpdateDailyReportDto } from './dto/update-daily-report.dto';
+import { AuditAction, InventoryTransactionType, ProjectUserStatus } from '@prisma/client';
+
 
 @Injectable()
 export class DailyReportsService {
@@ -19,7 +21,7 @@ export class DailyReportsService {
   async create(dto: CreateDailyReportDto, userId?: number) {
     const projectId = Number(dto.projectId);
 
-    if (!projectId) {
+    if (!projectId) { 
       throw new BadRequestException('Project is required');
     }
 
@@ -79,6 +81,131 @@ export class DailyReportsService {
 
     return report;
   }
+async getProjectDefaults(projectId: number) {
+  const project = await this.prisma.project.findUnique({
+    where: { id: projectId },
+    select: {
+      id: true,
+      code: true,
+      name: true,
+      location: true,
+    },
+  });
+
+  if (!project) {
+    throw new NotFoundException('Project not found');
+  }
+
+const manpowerCount = await this.prisma.projectUser.count({
+  where: {
+    projectId,
+    status: ProjectUserStatus.ACTIVE,
+  },
+});
+
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+
+  const tomorrow = new Date(today);
+  tomorrow.setDate(tomorrow.getDate() + 1);
+
+  const receivedMaterials = await this.prisma.inventoryTransaction.findMany({
+    where: {
+      projectId,
+      type: InventoryTransactionType.RECEIVE,
+      createdAt: {
+        gte: today,
+        lt: tomorrow,
+      },
+    },
+    include: {
+      material: {
+        select: {
+          code: true,
+          name: true,
+          unit: true,
+        },
+      },
+    },
+    orderBy: {
+      createdAt: 'desc',
+    },
+  });
+
+  const materialReceived = receivedMaterials.length
+    ? receivedMaterials
+        .map(
+          (item) =>
+            `${item.material.code} - ${item.material.name}: ${item.quantity} ${
+              item.unit || item.material.unit
+            }`,
+        )
+        .join('\n')
+    : '';
+
+  const weather = project.location
+    ? await this.getWeatherByLocation(project.location)
+    : '';
+
+  return {
+    weather,
+    manpowerCount,
+    materialReceived,
+  };
+}
+
+private async getWeatherByLocation(location: string) {
+  try {
+    const geoResponse = await fetch(
+      `https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(
+        location,
+      )}&count=1`,
+    );
+
+    const geoData: any = await geoResponse.json();
+    const place = geoData?.results?.[0];
+
+    if (!place) {
+      return `Weather unavailable for ${location}`;
+    }
+
+    const weatherResponse = await fetch(
+      `https://api.open-meteo.com/v1/forecast?latitude=${place.latitude}&longitude=${place.longitude}&current=temperature_2m,weather_code`,
+    );
+
+    const weatherData: any = await weatherResponse.json();
+    const current = weatherData?.current;
+
+    if (!current) {
+      return `Weather unavailable for ${location}`;
+    }
+
+    return `${this.weatherCodeToText(current.weather_code)}, ${current.temperature_2m}°C`;
+  } catch {
+    return `Weather unavailable for ${location}`;
+  }
+}
+
+private weatherCodeToText(code: number) {
+  const map: Record<number, string> = {
+    0: 'Clear sky',
+    1: 'Mainly clear',
+    2: 'Partly cloudy',
+    3: 'Overcast',
+    45: 'Fog',
+    48: 'Rime fog',
+    51: 'Light drizzle',
+    53: 'Moderate drizzle',
+    55: 'Dense drizzle',
+    61: 'Slight rain',
+    63: 'Moderate rain',
+    65: 'Heavy rain',
+    80: 'Rain showers',
+    95: 'Thunderstorm',
+  };
+
+  return map[code] || 'Weather condition';
+}
 
   async findByProject(projectId: number) {
     const project = await this.prisma.project.findUnique({

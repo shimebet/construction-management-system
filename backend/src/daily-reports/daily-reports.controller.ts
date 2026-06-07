@@ -18,7 +18,7 @@ import { DailyReportsService } from './daily-reports.service';
 @Controller('daily-reports')
 @UseGuards(JwtAuthGuard)
 export class DailyReportsController {
-  constructor(private readonly dailyReportsService: DailyReportsService) {}
+  constructor(private readonly dailyReportsService: DailyReportsService) {} 
 
   @Post()
   create(@Body() dto: CreateDailyReportDto, @CurrentUser() user: any) {
@@ -29,7 +29,10 @@ export class DailyReportsController {
   findByProject(@Param('projectId', ParseIntPipe) projectId: number) {
     return this.dailyReportsService.findByProject(projectId);
   }
-
+@Get('project/:projectId/defaults')
+getProjectDefaults(@Param('projectId', ParseIntPipe) projectId: number) {
+  return this.dailyReportsService.getProjectDefaults(projectId);
+}
   @Get(':id')
   findOne(@Param('id', ParseIntPipe) id: number) {
     return this.dailyReportsService.findOne(id);

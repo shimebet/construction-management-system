@@ -24,7 +24,7 @@ export class ProjectsService {
     });
 
     if (!company) {
-      throw new NotFoundException('Company not found');
+      throw new NotFoundException('Company not found'); 
     }
 
     const existingProject = await this.prisma.project.findFirst({
