@@ -16,7 +16,7 @@ const allowedReviewStatuses = ['APPROVED', 'REJECTED', 'RETURNED'];
 export class ApprovalsService {
   constructor(
     private readonly prisma: PrismaService,
-    private readonly auditService: AuditService,
+    private readonly auditService: AuditService, 
   ) {}
 
   async create(dto: CreateApprovalDto, currentUserId?: number) {
