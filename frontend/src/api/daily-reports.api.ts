@@ -40,9 +40,20 @@ export type CreateDailyReportPayload = {
   remarks?: string;
 };
 
+export type DailyReportDefaults = {
+  weather: string;
+  manpowerCount: number;
+  materialReceived: string;
+};
+
 export const dailyReportsApi = {
   findByProject: async (projectId: number): Promise<DailyReport[]> => {
     const response = await api.get(`/daily-reports/project/${projectId}`);
+    return response.data;
+  },
+
+  getProjectDefaults: async (projectId: number): Promise<DailyReportDefaults> => {
+    const response = await api.get(`/daily-reports/project/${projectId}/defaults`);
     return response.data;
   },
 

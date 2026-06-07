@@ -27,7 +27,7 @@ export default function ProjectsPage() {
   const [projects, setProjects] = useState<Project[]>([]);
   const [selectedCompanyId, setSelectedCompanyId] = useState<number | ''>('');
   const [editingProject, setEditingProject] = useState<Project | null>(null);
-  const [form, setForm] = useState<CreateProjectPayload>(emptyForm);
+  const [form, setForm] = useState<CreateProjectPayload>(emptyForm); 
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState('');
 

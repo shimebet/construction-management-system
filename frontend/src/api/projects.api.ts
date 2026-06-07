@@ -28,7 +28,7 @@ export type CreateProjectPayload = {
   location?: string;
   startDate?: string;
   endDate?: string;
-  budget?: number;
+  budget?: number; 
   currency?: string;
   status?: string;
 };

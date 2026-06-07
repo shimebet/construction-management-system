@@ -47,7 +47,8 @@ export default function DailyReportsPage() {
   const [selectedReport, setSelectedReport] = useState<DailyReport | null>(null);
   const [editingReport, setEditingReport] = useState<DailyReport | null>(null);
   const [mode, setMode] = useState<ReportMode>('create');
-
+  const [exportScope, setExportScope] = useState<'all' | 'date'>('all');
+  const [exportDate, setExportDate] = useState('');
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState('');
   const [search, setSearch] = useState('');
@@ -82,7 +83,8 @@ export default function DailyReportsPage() {
     return `buildpro-daily-reports-${projectCode}-${date}`;
   }, [selectedProject]);
 
-  const isSuccess = message.toLowerCase().includes('successfully');
+  const isSuccess =
+    message.toLowerCase().includes('successfully');
 
   useEffect(() => {
     loadProjects();
@@ -140,6 +142,20 @@ export default function DailyReportsPage() {
 
     if (projectId) {
       await loadReports(projectId);
+
+      try {
+        const defaults = await dailyReportsApi.getProjectDefaults(projectId);
+
+        setForm((prev) => ({
+          ...prev,
+          projectId,
+          weather: defaults.weather || '',
+          manpowerCount: defaults.manpowerCount ?? 0,
+          materialReceived: defaults.materialReceived || '',
+        }));
+      } catch (error) {
+        console.error('Failed to load project defaults', error);
+      }
     } else {
       setReports([]);
     }
@@ -174,10 +190,12 @@ export default function DailyReportsPage() {
       setLoading(true);
       setMessage('');
 
+      const projectId = Number(form.projectId);
+
       const payload: CreateDailyReportPayload = {
         ...form,
-        projectId: Number(form.projectId),
-        manpowerCount: Number(form.manpowerCount ?? 0),
+        projectId,
+        manpowerCount: Number(form.manpowerCount || 0),
         weather: form.weather?.trim() || '',
         equipmentUsed: form.equipmentUsed?.trim() || '',
         workCompleted: form.workCompleted?.trim() || '',
@@ -187,16 +205,27 @@ export default function DailyReportsPage() {
         remarks: form.remarks?.trim() || '',
       };
 
+      let successMessage = '';
+
       if (mode === 'edit' && editingReport) {
         await dailyReportsApi.update(editingReport.id, payload);
-        setMessage('Daily report updated successfully');
+        successMessage = 'Daily report updated successfully';
       } else {
         await dailyReportsApi.create(payload);
-        setMessage('Daily report created successfully');
+        successMessage = 'Daily report created successfully';
       }
 
-      resetForm(Number(form.projectId));
-      await loadReports(Number(form.projectId));
+      const data = await dailyReportsApi.findByProject(projectId);
+      setReports(data);
+
+      setMode('create');
+      setEditingReport(null);
+      setForm({
+        ...emptyForm,
+        projectId,
+      });
+
+      setMessage(successMessage);
     } catch (error: any) {
       setMessage(
         getErrorMessage(
@@ -269,16 +298,32 @@ export default function DailyReportsPage() {
     return {
       project: selectedProject
         ? {
-            id: selectedProject.id,
-            code: selectedProject.code,
-            name: selectedProject.name,
-          }
+          id: selectedProject.id,
+          code: selectedProject.code,
+          name: selectedProject.name,
+        }
         : null,
       reports,
       exportedAt: new Date().toISOString(),
     };
   }
+  function PdfDetail({ label, value }: { label: string; value: string }) {
+    return (
+      <div>
+        <div style={pdfLabelStyle}>{label}</div>
+        <div style={pdfValueStyle}>{value}</div>
+      </div>
+    );
+  }
 
+  function PdfBlock({ label, value }: { label: string; value?: string | null }) {
+    return (
+      <div style={pdfBlockStyle}>
+        <div style={pdfLabelStyle}>{label}</div>
+        <div style={pdfTextStyle}>{value || '-'}</div>
+      </div>
+    );
+  }
   function downloadFile(content: string, fileName: string, mimeType: string) {
     const blob = new Blob([content], { type: mimeType });
     const url = URL.createObjectURL(blob);
@@ -336,26 +381,231 @@ export default function DailyReportsPage() {
     downloadFile(csv, `${reportFileName}.csv`, 'text/csv;charset=utf-8');
   }
 
-  function exportPdf() {
-    const element = document.getElementById('daily-reports-printable');
 
-    if (!element) {
-      setMessage('Printable daily report section not found');
-      return;
+  const exportReports = useMemo(() => {
+    if (exportScope === 'date' && exportDate) {
+      return reports.filter((report) => dateKey(report.reportDate) === exportDate);
     }
 
-    html2pdf()
-      .set({
-        margin: 10,
-        filename: `${reportFileName}.pdf`,
-        image: { type: 'jpeg', quality: 0.98 },
-        html2canvas: { scale: 2, useCORS: true },
-        jsPDF: { unit: 'mm', format: 'a4', orientation: 'landscape' },
-      })
-      .from(element)
-      .save();
+    return reports;
+  }, [reports, exportScope, exportDate]);
+
+
+  function exportPdf() {
+  if (exportScope === 'date' && !exportDate) {
+    setMessage('Please select report date');
+    return;
   }
 
+  if (exportReports.length === 0) {
+    setMessage('No reports found for selected export option');
+    return;
+  }
+
+  const printable = document.createElement('div');
+  printable.innerHTML = buildPdfHtml(exportReports);
+  printable.style.width = '700px';
+  printable.style.background = '#ffffff';
+  printable.style.color = '#111827';
+  printable.style.fontFamily = 'Arial, sans-serif';
+
+  document.body.appendChild(printable);
+
+  const fileDate =
+    exportScope === 'date'
+      ? exportDate
+      : new Date().toISOString().slice(0, 10);
+
+  html2pdf()
+    .set({
+      margin: 12,
+      filename: `daily-site-report-${selectedProject?.code || 'project'}-${fileDate}.pdf`,
+      image: { type: 'jpeg', quality: 0.98 },
+      html2canvas: {
+        scale: 2,
+        useCORS: true,
+        backgroundColor: '#ffffff',
+      },
+      jsPDF: {
+        unit: 'mm',
+        format: 'a4',
+        orientation: 'portrait',
+      },
+      pagebreak: {
+        mode: ['css', 'legacy'],
+        avoid: ['.avoid-break'],
+      },
+    })
+    .from(printable)
+    .save()
+    .then(() => {
+      document.body.removeChild(printable);
+    })
+    .catch(() => {
+      document.body.removeChild(printable);
+      setMessage('Failed to export PDF');
+    });
+}
+
+  function buildPdfHtml(items: DailyReport[]) {
+  const projectTitle = selectedProject
+    ? `${selectedProject.code} - ${selectedProject.name}`
+    : 'Selected Project';
+
+  const generatedAt = new Date().toLocaleString();
+
+  return `
+    <div style="font-family:Arial,sans-serif;color:#111827;">
+      ${items
+        .map(
+          (report, index) => `
+            <div style="
+              padding:14px;
+              page-break-after:${index === items.length - 1 ? 'auto' : 'always'};
+            ">
+              <div style="
+                border-bottom:3px solid #111827;
+                padding-bottom:10px;
+                margin-bottom:12px;
+              ">
+                <h1 style="margin:0;font-size:22px;font-weight:800;">
+                  DAILY SITE REPORT
+                </h1>
+
+                <div style="font-size:12px;margin-top:4px;color:#374151;">
+                  ${escapeHtml(projectTitle)}
+                </div>
+              </div>
+
+              <div style="
+                display:grid;
+                grid-template-columns:repeat(3, 1fr);
+                gap:8px;
+                background:#f9fafb;
+                border:1px solid #e5e7eb;
+                padding:10px;
+                margin-bottom:10px;
+              ">
+                ${pdfField('Report No', `DSR-${String(report.id).padStart(5, '0')}`)}
+                ${pdfField('Report Date', formatDate(report.reportDate))}
+                ${pdfField('Generated', generatedAt)}
+
+                ${pdfField('Project', report.project ? `${report.project.code} - ${report.project.name}` : projectTitle)}
+                ${pdfField('Prepared By', report.preparedBy?.name || '-')}
+                ${pdfField('Weather', report.weather || '-')}
+
+                ${pdfField('Manpower', String(report.manpowerCount ?? 0))}
+                ${pdfField('Status', 'Submitted')}
+                ${pdfField('Document Type', 'Daily Site Report')}
+              </div>
+
+              ${pdfBlock('Equipment Used', report.equipmentUsed)}
+              ${pdfBlock('Work Completed', report.workCompleted)}
+              ${pdfBlock('Material Received', report.materialReceived)}
+              ${pdfBlock('Issues / Constraints', report.issues)}
+              ${pdfBlock('Delays', report.delays)}
+              ${pdfBlock('Remarks', report.remarks)}
+
+              <div class="avoid-break" style="
+                display:grid;
+                grid-template-columns:1fr 1fr 1fr;
+                gap:14px;
+                margin-top:16px;
+                padding-top:14px;
+                border-top:2px solid #e5e7eb;
+                font-size:11px;
+                page-break-inside:avoid;
+                break-inside:avoid;
+              ">
+                ${signatureBlock('Prepared By')}
+                ${signatureBlock('Reviewed By')}
+                ${signatureBlock('Approved By')}
+              </div>
+
+              <div class="avoid-break" style="
+                margin-top:12px;
+                font-size:9px;
+                color:#6b7280;
+                border-top:1px solid #e5e7eb;
+                padding-top:6px;
+                display:flex;
+                justify-content:space-between;
+                page-break-inside:avoid;
+                break-inside:avoid;
+              ">
+                <span>BuildPro IMS - Daily Site Report</span>
+                <span>Controlled document generated electronically</span>
+              </div>
+            </div>
+          `,
+        )
+        .join('')}
+    </div>
+  `;
+}
+
+  function pdfField(label: string, value: string) {
+    return `
+    <div>
+      <div style="font-size:10px;font-weight:700;color:#6b7280;text-transform:uppercase;margin-bottom:4px;">
+        ${escapeHtml(label)}
+      </div>
+      <div style="font-size:12px;font-weight:700;color:#111827;">
+        ${escapeHtml(value)}
+      </div>
+    </div>
+  `;
+  }
+
+  function pdfBlock(label: string, value?: string | null) {
+    return `
+    <div style="
+      border:1px solid #e5e7eb;
+      margin-top:7px;
+      page-break-inside:avoid;
+      break-inside:avoid;
+    ">
+      <div style="
+        background:#f3f4f6;
+        padding:6px 9px;
+        font-size:11px;
+        font-weight:700;
+        color:#374151;
+        text-transform:uppercase;
+      ">
+        ${escapeHtml(label)}
+      </div>
+
+      <div style="
+        min-height:26px;
+        padding:8px 10px;
+        font-size:12px;
+        line-height:1.35;
+        white-space:pre-wrap;
+      ">
+        ${escapeHtml(value || '-')}
+      </div>
+    </div>
+  `;
+  }
+  function signatureBlock(label: string) {
+    return `
+    <div>
+      <strong>${escapeHtml(label)}</strong>
+      <div style="margin-top:22px;border-top:1px solid #111827;padding-top:5px;">
+        Name / Signature / Date
+      </div>
+    </div>
+  `;
+  }
+  function escapeHtml(value: string) {
+    return String(value)
+      .replaceAll('&', '&amp;')
+      .replaceAll('<', '&lt;')
+      .replaceAll('>', '&gt;')
+      .replaceAll('"', '&quot;')
+      .replaceAll("'", '&#039;');
+  }
   return (
     <div>
       <PageHeader
@@ -363,32 +613,90 @@ export default function DailyReportsPage() {
         description="Record, review, edit, export, and audit daily site reports."
       />
 
-      {message && <Alert type={isSuccess ? 'success' : 'error'}>{message}</Alert>}
+      {message && (
+        <div
+          style={{
+            marginBottom: 16,
+            padding: 12,
+            borderRadius: 8,
+            fontWeight: 600,
+            background: isSuccess ? '#dcfce7' : '#fee2e2',
+            color: isSuccess ? '#166534' : '#991b1b',
+            border: isSuccess ? '1px solid #86efac' : '1px solid #fca5a5',
+          }}
+        >
+          {message}
+        </div>
+      )}
 
       <div style={summaryGridStyle}>
         <MetricCard label="Total Reports" value={reports.length} />
         <MetricCard label="Selected Project" value={selectedProject?.code || '-'} />
-        <MetricCard label="Total Manpower" value={reports.reduce((sum, item) => sum + Number(item.manpowerCount || 0), 0)} />
-        <MetricCard label="Reports With Issues" value={reports.filter((item) => Boolean(item.issues)).length} />
+        <MetricCard
+          label="Total Manpower"
+          value={reports.reduce((sum, item) => sum + Number(item.manpowerCount || 0), 0)}
+        />
+        <MetricCard
+          label="Reports With Issues"
+          value={reports.filter((item) => Boolean(item.issues)).length}
+        />
+      </div>
+
+      <div style={exportOptionsStyle}>
+        <SelectField
+          label="PDF Export Scope"
+          value={exportScope}
+          onChange={(value) => setExportScope(value as 'all' | 'date')}
+        >
+          <option value="all">All Reports</option>
+          <option value="date">Specific Date</option>
+        </SelectField>
+
+        {exportScope === 'date' && (
+          <SelectField
+            label="Export Date"
+            value={exportDate}
+            onChange={setExportDate}
+          >
+            <option value="">Select report date</option>
+            {reports.map((report) => (
+              <option key={report.id} value={dateKey(report.reportDate)}>
+                {formatDate(report.reportDate)}
+              </option>
+            ))}
+          </SelectField>
+        )}
       </div>
 
       <div style={actionBarStyle}>
         <IconActionButton title="Download JSON" onClick={exportJson}>
           <FileJson size={16} /> JSON
         </IconActionButton>
+
         <IconActionButton title="Download CSV" onClick={exportCsv}>
           <FileSpreadsheet size={16} /> CSV
         </IconActionButton>
+
         <IconActionButton title="Download PDF" onClick={exportPdf}>
           <FileText size={16} /> PDF
         </IconActionButton>
-        <IconActionButton title="Refresh" onClick={() => selectedProjectId && loadReports(Number(selectedProjectId))}>
+
+        <IconActionButton
+          title="Refresh"
+          onClick={() => selectedProjectId && loadReports(Number(selectedProjectId))}
+        >
           <RefreshCcw size={16} /> Refresh
         </IconActionButton>
       </div>
 
       <div className="module-grid">
-        <Card title={mode === 'edit' ? `Edit Daily Report: ${formatDate(editingReport?.reportDate)}` : 'Create Daily Report'}>
+        <Card
+          title={
+            mode === 'edit'
+              ? `Edit Daily Report: ${formatDate(editingReport?.reportDate)}`
+              : 'Create Daily Report'
+          }
+        >
           <form onSubmit={handleSubmit}>
             <SelectField label="Project" value={form.projectId} onChange={handleProjectChange}>
               <option value={0}>Select project</option>
@@ -422,12 +730,41 @@ export default function DailyReportsPage() {
               onChange={(event) => updateField('manpowerCount', Number(event.target.value))}
             />
 
-            <TextareaField label="Equipment Used" value={form.equipmentUsed ?? ''} onChange={(value) => updateField('equipmentUsed', value)} />
-            <TextareaField label="Work Completed" value={form.workCompleted ?? ''} onChange={(value) => updateField('workCompleted', value)} />
-            <TextareaField label="Material Received" value={form.materialReceived ?? ''} onChange={(value) => updateField('materialReceived', value)} />
-            <TextareaField label="Issues" value={form.issues ?? ''} onChange={(value) => updateField('issues', value)} />
-            <TextareaField label="Delays" value={form.delays ?? ''} onChange={(value) => updateField('delays', value)} />
-            <TextareaField label="Remarks" value={form.remarks ?? ''} onChange={(value) => updateField('remarks', value)} />
+            <TextareaField
+              label="Equipment Used"
+              value={form.equipmentUsed ?? ''}
+              onChange={(value) => updateField('equipmentUsed', value)}
+            />
+
+            <TextareaField
+              label="Work Completed"
+              value={form.workCompleted ?? ''}
+              onChange={(value) => updateField('workCompleted', value)}
+            />
+
+            <TextareaField
+              label="Material Received"
+              value={form.materialReceived ?? ''}
+              onChange={(value) => updateField('materialReceived', value)}
+            />
+
+            <TextareaField
+              label="Issues"
+              value={form.issues ?? ''}
+              onChange={(value) => updateField('issues', value)}
+            />
+
+            <TextareaField
+              label="Delays"
+              value={form.delays ?? ''}
+              onChange={(value) => updateField('delays', value)}
+            />
+
+            <TextareaField
+              label="Remarks"
+              value={form.remarks ?? ''}
+              onChange={(value) => updateField('remarks', value)}
+            />
 
             <div style={{ display: 'flex', gap: 10, marginTop: 8 }}>
               <Button disabled={loading} style={{ flex: 1 }}>
@@ -472,10 +809,16 @@ export default function DailyReportsPage() {
                       <IconOnlyButton title="View" onClick={() => handleView(row)}>
                         <Eye size={15} />
                       </IconOnlyButton>
+
                       <IconOnlyButton title="Edit" onClick={() => handleEdit(row)}>
                         <Edit size={15} />
                       </IconOnlyButton>
-                      <IconOnlyButton title="Delete" onClick={() => handleDelete(row.id)} color="#dc2626">
+
+                      <IconOnlyButton
+                        title="Delete"
+                        onClick={() => handleDelete(row.id)}
+                        color="#dc2626"
+                      >
                         <Trash2 size={15} />
                       </IconOnlyButton>
                     </div>
@@ -489,13 +832,145 @@ export default function DailyReportsPage() {
         </Card>
       </div>
 
+      {/* PDF EXPORT TEMPLATE - hidden from screen, used only for PDF */}
+      {/* <div id="daily-reports-pdf" style={pdfContainerStyle}>
+      <div style={pdfHeaderStyle}>
+        <h1 style={{ margin: 0 }}>Daily Site Report</h1>
+
+        <p style={{ margin: '6px 0 0' }}>
+          {selectedProject
+            ? `${selectedProject.code} - ${selectedProject.name}`
+            : 'Selected Project'}
+        </p>
+      </div>
+
+      {exportReports.map((report) => (
+        <div key={report.id} style={pdfReportCardStyle}>
+          <h2 style={pdfSectionTitleStyle}>
+            Report Date: {formatDate(report.reportDate)}
+          </h2>
+
+          <div style={pdfGridStyle}>
+            <PdfDetail
+              label="Project"
+              value={
+                report.project
+                  ? `${report.project.code} - ${report.project.name}`
+                  : selectedProject
+                    ? `${selectedProject.code} - ${selectedProject.name}`
+                    : '-'
+              }
+            />
+
+            <PdfDetail label="Prepared By" value={report.preparedBy?.name || '-'} />
+            <PdfDetail label="Weather" value={report.weather || '-'} />
+            <PdfDetail label="Manpower" value={String(report.manpowerCount ?? 0)} />
+          </div>
+
+          <PdfBlock label="Equipment Used" value={report.equipmentUsed} />
+          <PdfBlock label="Work Completed" value={report.workCompleted} />
+          <PdfBlock label="Material Received" value={report.materialReceived} />
+          <PdfBlock label="Issues" value={report.issues} />
+          <PdfBlock label="Delays" value={report.delays} />
+          <PdfBlock label="Remarks" value={report.remarks} />
+
+          <div style={pdfSignatureStyle}>
+            <div>Prepared By: ______________________</div>
+            <div>Reviewed By: ______________________</div>
+          </div>
+        </div>
+      ))}
+    </div> */}
+
       {selectedReport && (
-        <DailyReportDetailsModal report={selectedReport} onClose={() => setSelectedReport(null)} />
+        <DailyReportDetailsModal
+          report={selectedReport}
+          onClose={() => setSelectedReport(null)}
+        />
       )}
     </div>
   );
 }
 
+const exportOptionsStyle: React.CSSProperties = {
+  display: 'grid',
+  gridTemplateColumns: '220px 220px',
+  gap: 12,
+  alignItems: 'end',
+  marginBottom: 12,
+};
+
+const pdfContainerStyle: React.CSSProperties = {
+  position: 'fixed',
+  left: 0,
+  top: 0,
+  width: 794,
+  minHeight: 1123,
+  background: '#fff',
+  color: '#111827',
+  padding: 32,
+  fontFamily: 'Arial, sans-serif',
+  zIndex: -1,
+  opacity: 1,
+  pointerEvents: 'none',
+};
+
+const pdfHeaderStyle: React.CSSProperties = {
+  borderBottom: '2px solid #111827',
+  paddingBottom: 12,
+  marginBottom: 20,
+};
+
+const pdfReportCardStyle: React.CSSProperties = {
+  pageBreakAfter: 'always',
+  border: '1px solid #d1d5db',
+  padding: 18,
+  marginBottom: 24,
+};
+
+const pdfSectionTitleStyle: React.CSSProperties = {
+  fontSize: 18,
+  margin: '0 0 16px',
+};
+
+const pdfGridStyle: React.CSSProperties = {
+  display: 'grid',
+  gridTemplateColumns: '1fr 1fr',
+  gap: 12,
+  marginBottom: 16,
+};
+
+const pdfBlockStyle: React.CSSProperties = {
+  borderTop: '1px solid #e5e7eb',
+  paddingTop: 10,
+  marginTop: 10,
+};
+
+const pdfLabelStyle: React.CSSProperties = {
+  fontSize: 12,
+  fontWeight: 700,
+  color: '#374151',
+  marginBottom: 4,
+};
+
+const pdfValueStyle: React.CSSProperties = {
+  fontSize: 14,
+  fontWeight: 600,
+};
+
+const pdfTextStyle: React.CSSProperties = {
+  fontSize: 13,
+  lineHeight: 1.5,
+  whiteSpace: 'pre-wrap',
+};
+
+const pdfSignatureStyle: React.CSSProperties = {
+  display: 'grid',
+  gridTemplateColumns: '1fr 1fr',
+  gap: 24,
+  marginTop: 28,
+  fontSize: 13,
+};
 function DailyReportDetailsModal({ report, onClose }: { report: DailyReport; onClose: () => void }) {
   return (
     <div style={modalOverlayStyle} role="dialog" aria-modal="true">
@@ -608,7 +1083,10 @@ function Detail({ label, value, wide }: { label: string; value: string; wide?: b
     </div>
   );
 }
-
+function dateKey(value?: string | null) {
+  if (!value) return '';
+  return String(value).slice(0, 10);
+}
 function formatDate(value?: string | null) {
   if (!value) return '-';
   const date = new Date(value);
