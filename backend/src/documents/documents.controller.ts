@@ -3,7 +3,6 @@ import {
   Body,
   Controller,
   Get,
-  Header,
   Param,
   ParseIntPipe,
   Patch,
@@ -81,7 +80,9 @@ export class DocumentsController {
         destination: './uploads/documents',
         filename: (_req, file, callback) => {
           const safeName = file.originalname.replace(/[^a-zA-Z0-9._-]/g, '_');
-          const uniqueName = `${Date.now()}-${Math.round(Math.random() * 1e9)}-${safeName}`;
+          const uniqueName = `${Date.now()}-${Math.round(
+            Math.random() * 1e9,
+          )}-${safeName}`;
           callback(null, uniqueName);
         },
       }),
@@ -97,13 +98,14 @@ export class DocumentsController {
     @Body('notes') notes: string,
     @CurrentUser() user: any,
   ) {
-    if (!file) throw new BadRequestException('File is required');
-    if (!revision || !revision.trim()) throw new BadRequestException('Revision is required');
+    if (!file) {
+      throw new BadRequestException('File is required');
+    }
 
     return this.documentsService.createVersion(
       {
         documentId,
-        revision: revision.trim().toUpperCase(),
+        revision: revision?.trim().toUpperCase(),
         status: status as any,
         fileName: file.originalname,
         filePath: file.path.replace(/\\/g, '/'),
@@ -134,12 +136,18 @@ export class DocumentsController {
     return this.documentsService.archive(id, Number(user.sub));
   }
 
-  @Patch(':id/status/:status')
+  @Patch(':id/status')
   changeStatus(
     @Param('id', ParseIntPipe) id: number,
-    @Param('status') status: string,
+    @Body('status') status: string,
+    @Body('rejectionReason') rejectionReason: string,
     @CurrentUser() user: any,
   ) {
-    return this.documentsService.changeStatus(id, status, Number(user.sub));
+    return this.documentsService.changeStatus(
+      id,
+      status,
+      rejectionReason,
+      Number(user.sub),
+    );
   }
 }

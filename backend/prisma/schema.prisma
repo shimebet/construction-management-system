@@ -227,6 +227,7 @@ enum VariationStatus {
   APPROVED
   REJECTED
 }
+
 model ContactInquiry {
   id        Int      @id @default(autoincrement())
   name      String
@@ -242,6 +243,7 @@ model ContactInquiry {
 
   @@map("contact_inquiries")
 }
+
 model User {
   id           Int        @id @default(autoincrement())
   name         String
@@ -819,13 +821,14 @@ model Document {
   status          DocumentStatus @default(WIP)
   currentRevision String?
   description     String?
+  rejectionReason String?        @db.Text
 
-  project  Project           @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  versions DocumentVersion[]
-
-  createdAt  DateTime    @default(now())
-  updatedAt  DateTime    @updatedAt
+  project    Project           @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  versions   DocumentVersion[]
   submittals Submittal[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@unique([projectId, code])
   @@index([projectId])
