@@ -14,14 +14,12 @@ export enum SubmittalStatusDto {
   APPROVED_WITH_COMMENTS = 'APPROVED_WITH_COMMENTS',
   REJECTED = 'REJECTED',
   REVISE_AND_RESUBMIT = 'REVISE_AND_RESUBMIT',
+  CLOSED = 'CLOSED',
 }
 
 export class CreateSubmittalDto {
   @IsNumber()
   projectId!: number;
-
-  @IsString()
-  code!: string;
 
   @IsString()
   title!: string;
@@ -31,16 +29,16 @@ export class CreateSubmittalDto {
   description?: string;
 
   @IsOptional()
+  @IsString()
+  specificationReference?: string;
+
+  @IsOptional()
   @IsEnum(SubmittalStatusDto)
   status?: SubmittalStatusDto;
 
   @IsOptional()
   @IsString()
   revision?: string;
-
-  @IsOptional()
-  @IsDateString()
-  submittedAt?: string;
 
   @IsOptional()
   @IsDateString()

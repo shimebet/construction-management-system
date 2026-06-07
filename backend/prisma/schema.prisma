@@ -130,6 +130,7 @@ enum SubmittalStatus {
   APPROVED_WITH_COMMENTS
   REJECTED
   REVISE_AND_RESUBMIT
+  CLOSED
 }
 
 enum ApprovalStatus {
@@ -293,8 +294,10 @@ model User {
   createdRfis  Rfi[] @relation("RfiCreator")
   assignedRfis Rfi[] @relation("RfiAssignee")
 
-  createdSubmittals  Submittal[] @relation("SubmittalCreator")
-  reviewedSubmittals Submittal[] @relation("SubmittalReviewer")
+  createdSubmittals   Submittal[] @relation("SubmittalCreator")
+  submittedSubmittals Submittal[] @relation("SubmittalSubmitter")
+  reviewSubmittals    Submittal[] @relation("SubmittalReviewer")
+  reviewedSubmittals  Submittal[] @relation("SubmittalReviewedBy")
 
   approvals Approval[]
 
@@ -894,24 +897,40 @@ model Rfi {
 }
 
 model Submittal {
-  id          Int             @id @default(autoincrement())
-  projectId   Int
-  code        String
-  title       String
-  description String?         @db.Text
+  id                     Int     @id @default(autoincrement())
+  projectId              Int
+  code                   String
+  submittalNo            String?
+  title                  String
+  description            String? @db.Text
+  specificationReference String?
+
   status      SubmittalStatus @default(DRAFT)
   revision    String?
-  submittedAt DateTime?
-  dueDate     DateTime?
-  closedAt    DateTime?
-  createdById Int?
-  reviewerId  Int?
-  documentId  Int?
+  reviewCycle Int             @default(1)
 
-  project   Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  createdBy User?     @relation("SubmittalCreator", fields: [createdById], references: [id], onDelete: SetNull)
-  reviewer  User?     @relation("SubmittalReviewer", fields: [reviewerId], references: [id], onDelete: SetNull)
-  document  Document? @relation(fields: [documentId], references: [id], onDelete: SetNull)
+  submittedAt    DateTime?
+  submissionDate DateTime?
+  reviewDate     DateTime?
+  approvalDate   DateTime?
+  dueDate        DateTime?
+  closedAt       DateTime?
+
+  comments        String? @db.Text
+  rejectionReason String? @db.Text
+
+  createdById   Int?
+  submittedById Int?
+  reviewerId    Int?
+  reviewedById  Int?
+  documentId    Int?
+
+  project     Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  createdBy   User?     @relation("SubmittalCreator", fields: [createdById], references: [id], onDelete: SetNull)
+  submittedBy User?     @relation("SubmittalSubmitter", fields: [submittedById], references: [id], onDelete: SetNull)
+  reviewer    User?     @relation("SubmittalReviewer", fields: [reviewerId], references: [id], onDelete: SetNull)
+  reviewedBy  User?     @relation("SubmittalReviewedBy", fields: [reviewedById], references: [id], onDelete: SetNull)
+  document    Document? @relation(fields: [documentId], references: [id], onDelete: SetNull)
 
   approvals Approval[]
 
@@ -922,7 +941,9 @@ model Submittal {
   @@index([projectId])
   @@index([status])
   @@index([createdById])
+  @@index([submittedById])
   @@index([reviewerId])
+  @@index([reviewedById])
   @@index([documentId])
   @@map("submittals")
 }

@@ -22,7 +22,7 @@ export class RfisService {
 
   async create(dto: CreateRfiDto, userId?: number) {
     const projectId = Number(dto.projectId);
-    if (!projectId) throw new BadRequestException('Project is required');
+    if (!projectId) throw new BadRequestException('Project is required'); 
 
     const project = await this.prisma.project.findUnique({
       where: { id: projectId },
@@ -35,16 +35,7 @@ export class RfisService {
       await this.validateUser(Number(dto.assignedToId));
     }
 
-    const code = this.requiredText(dto.code, 'RFI code').toUpperCase();
-
-    const duplicate = await this.prisma.rfi.findFirst({
-      where: { projectId, code },
-      select: { id: true },
-    });
-
-    if (duplicate) {
-      throw new BadRequestException('RFI code already exists for this project');
-    }
+const code = await this.generateRfiCode(projectId);
 
     const rfi = await this.prisma.rfi.create({
       data: {
@@ -346,7 +337,19 @@ export class RfisService {
 
     if (!user) throw new NotFoundException('Assigned user not found');
   }
+private async generateRfiCode(projectId: number) {
+  const latest = await this.prisma.rfi.findFirst({
+    where: { projectId },
+    orderBy: { id: 'desc' },
+    select: { code: true },
+  });
 
+  const latestNumber = Number(
+    String(latest?.code || 'RFI-000').replace('RFI-', ''),
+  );
+
+  return `RFI-${String(latestNumber + 1).padStart(3, '0')}`;
+}
   private normalizeStatus(status: string) {
     const value = String(status || '').trim().toUpperCase();
     if (!allowedStatuses.includes(value)) {

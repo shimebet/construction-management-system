@@ -18,6 +18,7 @@ const allowedStatuses = [
   'APPROVED_WITH_COMMENTS',
   'REJECTED',
   'REVISE_AND_RESUBMIT',
+  'CLOSED',
 ];
 
 const allowedReviewStatuses = [
@@ -37,7 +38,10 @@ export class SubmittalsService {
 
   async create(dto: CreateSubmittalDto, userId?: number) {
     const projectId = Number(dto.projectId);
-    if (!projectId) throw new BadRequestException('Project is required');
+
+    if (!projectId) {
+      throw new BadRequestException('Project is required');
+    }
 
     await this.validateProject(projectId);
 
@@ -49,33 +53,37 @@ export class SubmittalsService {
       await this.validateDocument(Number(dto.documentId), projectId);
     }
 
-    const code = this.requiredText(dto.code, 'Submittal code').toUpperCase();
+    const code = await this.generateSubmittalCode(projectId);
+    const status = this.normalizeStatus(dto.status ?? 'DRAFT');
 
-    const duplicate = await this.prisma.submittal.findFirst({
-      where: { projectId, code },
-      select: { id: true },
-    });
-
-    if (duplicate) {
-      throw new BadRequestException(
-        'Submittal code already exists for this project',
-      );
-    }
+    const submittedDate = status === 'SUBMITTED' ? new Date() : null;
 
     const submittal = await this.prisma.submittal.create({
       data: {
         projectId,
         code,
+        submittalNo: code,
+
         title: this.requiredText(dto.title, 'Title'),
         description: this.nullIfEmpty(dto.description),
-        status: this.normalizeStatus(dto.status ?? 'DRAFT'),
-        revision: this.nullIfEmpty(dto.revision)?.toUpperCase() ?? null,
-        submittedAt: dto.submittedAt
-          ? this.normalizeDate(dto.submittedAt)
-          : null,
+        specificationReference: this.nullIfEmpty(dto.specificationReference),
+
+        status,
+        revision: this.nullIfEmpty(dto.revision)?.toUpperCase() ?? 'A',
+        reviewCycle: 1,
+
+        submittedAt: submittedDate,
+        submissionDate: submittedDate,
         dueDate: dto.dueDate ? this.normalizeDate(dto.dueDate) : null,
+        closedAt: null,
+
+        comments: null,
+        rejectionReason: null,
+
         createdById: userId ?? null,
+        submittedById: submittedDate ? userId ?? null : null,
         reviewerId: dto.reviewerId ? Number(dto.reviewerId) : null,
+        reviewedById: null,
         documentId: dto.documentId ? Number(dto.documentId) : null,
       },
       include: this.submittalInclude(),
@@ -111,7 +119,9 @@ export class SubmittalsService {
       include: this.submittalInclude(),
     });
 
-    if (!submittal) throw new NotFoundException('Submittal not found');
+    if (!submittal) {
+      throw new NotFoundException('Submittal not found');
+    }
 
     return submittal;
   }
@@ -129,7 +139,9 @@ export class SubmittalsService {
       ? Number(dto.projectId)
       : oldSubmittal.projectId;
 
-    if (dto.projectId) await this.validateProject(projectId);
+    if (dto.projectId) {
+      await this.validateProject(projectId);
+    }
 
     if (dto.reviewerId) {
       await this.validateUser(Number(dto.reviewerId), 'Reviewer not found');
@@ -139,72 +151,62 @@ export class SubmittalsService {
       await this.validateDocument(Number(dto.documentId), projectId);
     }
 
-    const nextCode = dto.code
-      ? this.requiredText(dto.code, 'Submittal code').toUpperCase()
-      : oldSubmittal.code;
-
-    if (dto.code || dto.projectId) {
-      const duplicate = await this.prisma.submittal.findFirst({
-        where: {
-          projectId,
-          code: nextCode,
-          NOT: { id },
-        },
-        select: { id: true },
-      });
-
-      if (duplicate) {
-        throw new BadRequestException(
-          'Submittal code already exists for this project',
-        );
-      }
-    }
+    const nextStatus =
+      dto.status !== undefined ? this.normalizeStatus(dto.status) : undefined;
 
     const updated = await this.prisma.submittal.update({
       where: { id },
       data: {
         projectId: dto.projectId ? projectId : undefined,
-        code: dto.code !== undefined ? nextCode : undefined,
+
         title:
           dto.title !== undefined
             ? this.requiredText(dto.title, 'Title')
             : undefined,
+
         description:
           dto.description !== undefined
             ? this.nullIfEmpty(dto.description)
             : undefined,
-        status:
-          dto.status !== undefined
-            ? this.normalizeStatus(dto.status)
+
+        specificationReference:
+          dto.specificationReference !== undefined
+            ? this.nullIfEmpty(dto.specificationReference)
             : undefined,
+
+        status: nextStatus,
+
         revision:
           dto.revision !== undefined
-            ? this.nullIfEmpty(dto.revision)?.toUpperCase() ?? null
+            ? this.nullIfEmpty(dto.revision)?.toUpperCase() ?? 'A'
             : undefined,
-        submittedAt:
-          dto.submittedAt !== undefined
-            ? dto.submittedAt
-              ? this.normalizeDate(dto.submittedAt)
-              : null
-            : undefined,
+
         dueDate:
           dto.dueDate !== undefined
             ? dto.dueDate
               ? this.normalizeDate(dto.dueDate)
               : null
             : undefined,
+
         reviewerId:
           dto.reviewerId !== undefined
             ? dto.reviewerId
               ? Number(dto.reviewerId)
               : null
             : undefined,
+
         documentId:
           dto.documentId !== undefined
             ? dto.documentId
               ? Number(dto.documentId)
               : null
             : undefined,
+
+        comments:
+          nextStatus && nextStatus !== 'REJECTED' ? null : undefined,
+
+        rejectionReason:
+          nextStatus && nextStatus !== 'REJECTED' ? null : undefined,
       },
       include: this.submittalInclude(),
     });
@@ -245,6 +247,8 @@ export class SubmittalsService {
       data: {
         status: 'SUBMITTED',
         submittedAt: new Date(),
+        submissionDate: new Date(),
+        submittedById: userId ?? null,
         closedAt: null,
       },
       include: this.submittalInclude(),
@@ -274,16 +278,42 @@ export class SubmittalsService {
 
     const reviewStatus = this.normalizeReviewStatus(dto.status);
 
+    if (reviewStatus === 'REJECTED' && !dto.rejectionReason?.trim()) {
+      throw new BadRequestException('Rejection reason is required');
+    }
+
     const closeOnReview = [
       'APPROVED',
       'APPROVED_WITH_COMMENTS',
       'REJECTED',
     ].includes(reviewStatus);
 
+    const shouldIncreaseCycle =
+      reviewStatus === 'REVISE_AND_RESUBMIT' ||
+      reviewStatus === 'REJECTED';
+
     const updated = await this.prisma.submittal.update({
       where: { id },
       data: {
         status: reviewStatus,
+        reviewedById: userId ?? null,
+        reviewDate: new Date(),
+
+        approvalDate:
+          reviewStatus === 'APPROVED' ||
+          reviewStatus === 'APPROVED_WITH_COMMENTS'
+            ? new Date()
+            : null,
+
+        comments: this.nullIfEmpty(dto.comments),
+
+        rejectionReason:
+          reviewStatus === 'REJECTED' ? dto.rejectionReason!.trim() : null,
+
+        reviewCycle: shouldIncreaseCycle
+          ? Number(oldSubmittal.reviewCycle || 1) + 1
+          : oldSubmittal.reviewCycle || 1,
+
         closedAt: closeOnReview ? new Date() : null,
       },
       include: this.submittalInclude(),
@@ -304,7 +334,10 @@ export class SubmittalsService {
         entityName: 'Submittal',
         entityId: updated.id,
         submittalId: updated.id,
-        comments: this.nullIfEmpty(dto.comments),
+        comments:
+          reviewStatus === 'REJECTED'
+            ? dto.rejectionReason!.trim()
+            : this.nullIfEmpty(dto.comments),
         approvedAt:
           reviewStatus === 'APPROVED' ||
           reviewStatus === 'APPROVED_WITH_COMMENTS'
@@ -344,6 +377,7 @@ export class SubmittalsService {
     const updated = await this.prisma.submittal.update({
       where: { id },
       data: {
+        status: 'CLOSED',
         closedAt: new Date(),
       },
       include: this.submittalInclude(),
@@ -421,6 +455,27 @@ export class SubmittalsService {
     return deleted;
   }
 
+  private async generateSubmittalCode(projectId: number) {
+    const project = await this.prisma.project.findUnique({
+      where: { id: projectId },
+      select: { code: true },
+    });
+
+    const latest = await this.prisma.submittal.findFirst({
+      where: { projectId },
+      orderBy: { id: 'desc' },
+      select: { code: true },
+    });
+
+    const latestNumber = Number(
+      String(latest?.code || 'SUB-0000').replace(/[^0-9]/g, ''),
+    );
+
+    const nextNumber = String(latestNumber + 1).padStart(4, '0');
+
+    return `${project?.code || 'PRJ'}-SUB-${nextNumber}`;
+  }
+
   private submittalInclude(): Prisma.SubmittalInclude {
     return {
       project: {
@@ -438,7 +493,23 @@ export class SubmittalsService {
           jobTitle: true,
         },
       },
+      submittedBy: {
+        select: {
+          id: true,
+          name: true,
+          email: true,
+          jobTitle: true,
+        },
+      },
       reviewer: {
+        select: {
+          id: true,
+          name: true,
+          email: true,
+          jobTitle: true,
+        },
+      },
+      reviewedBy: {
         select: {
           id: true,
           name: true,
@@ -467,7 +538,9 @@ export class SubmittalsService {
       select: { id: true },
     });
 
-    if (!project) throw new NotFoundException('Project not found');
+    if (!project) {
+      throw new NotFoundException('Project not found');
+    }
   }
 
   private async validateUser(id: number, message: string) {
@@ -476,7 +549,9 @@ export class SubmittalsService {
       select: { id: true },
     });
 
-    if (!user) throw new NotFoundException(message);
+    if (!user) {
+      throw new NotFoundException(message);
+    }
   }
 
   private async validateDocument(documentId: number, projectId: number) {
@@ -535,7 +610,9 @@ export class SubmittalsService {
   }
 
   private nullIfEmpty(value?: string | null) {
-    if (value === undefined || value === null) return null;
+    if (value === undefined || value === null) {
+      return null;
+    }
 
     const text = String(value).trim();
     return text || null;

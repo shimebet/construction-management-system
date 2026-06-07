@@ -3,7 +3,7 @@ import {
   Controller,
   Delete,
   Get,
-  Param,
+  Param, 
   ParseIntPipe,
   Patch,
   Post,
@@ -15,7 +15,7 @@ import { CreateSubmittalDto } from './dto/create-submittal.dto';
 import { ReviewSubmittalDto } from './dto/review-submittal.dto';
 import { UpdateSubmittalDto } from './dto/update-submittal.dto';
 import { SubmittalsService } from './submittals.service';
-
+ 
 @Controller('submittals')
 @UseGuards(JwtAuthGuard)
 export class SubmittalsController {
