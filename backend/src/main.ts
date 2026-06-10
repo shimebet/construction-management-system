@@ -5,8 +5,7 @@ import { join } from 'path';
 import { AppModule } from './app.module';
 
 async function bootstrap() {
-  const app =
-    await NestFactory.create<NestExpressApplication>(AppModule);
+  const app = await NestFactory.create<NestExpressApplication>(AppModule);
 
   app.setGlobalPrefix('api');
 
@@ -18,26 +17,24 @@ async function bootstrap() {
     }),
   );
 
+  const allowedOrigins: string[] = [
+    'http://localhost:5173',
+  ];
+
+  if (process.env.FRONTEND_URL) {
+    allowedOrigins.push(process.env.FRONTEND_URL);
+  }
+
   app.enableCors({
-    origin: 'http://localhost:5173',
+    origin: allowedOrigins,
     credentials: true,
   });
-
-  /*
-   |--------------------------------------------------------------------------
-   | Static Uploads
-   |--------------------------------------------------------------------------
-   | Serve uploaded files publicly:
-   | http://localhost:5000/uploads/avatars/...
-   | http://localhost:5000/uploads/documents/...
-   |--------------------------------------------------------------------------
-   */
 
   app.useStaticAssets(join(process.cwd(), 'uploads'), {
     prefix: '/uploads/',
   });
 
-  const port = process.env.APP_PORT ?? 5000;
+  const port = process.env.PORT || process.env.APP_PORT || 5000;
 
   await app.listen(port);
 
